@@ -3,7 +3,7 @@
 __all__ = ["GraphRAG", "QueryParam"]
 
 from dataclasses import dataclass, field
-from typing import Type
+from typing import Type, Dict, Callable, Optional
 
 from fast_graphrag._llm import DefaultEmbeddingService, DefaultLLMService
 from fast_graphrag._llm._base import BaseEmbeddingService
@@ -91,6 +91,9 @@ class GraphRAG(BaseGraphRAG[TEmbedding, THash, TChunk, TEntity, TRelation, TId])
             default_factory=lambda: EdgeUpsertPolicy_UpsertValidAndMergeSimilarByLLM()
         )
 
+        prefixes: Dict[str, str] = field(default_factory=dict)
+        resolve_curie: Callable[[str], Optional['URIRef']] = None
+
         def __post_init__(self):
             """Initialize the GraphRAG Config class."""
             self.entity_storage.embedding_dim = self.embedding_service.embedding_dim
@@ -103,7 +106,8 @@ class GraphRAG(BaseGraphRAG[TEmbedding, THash, TChunk, TEntity, TRelation, TId])
         self.embedding_service = self.config.embedding_service
         self.chunking_service = self.config.chunking_service_cls()
         self.information_extraction_service = self.config.information_extraction_service_cls(
-            graph_upsert=self.config.information_extraction_upsert_policy
+            graph_upsert=self.config.information_extraction_upsert_policy,
+            resolve_curie=self.config.resolve_curie
         )
         self.state_manager = self.config.state_manager_cls(
             workspace=Workspace.new(self.working_dir, keep_n=self.n_checkpoints),

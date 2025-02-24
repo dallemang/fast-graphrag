@@ -156,6 +156,7 @@ class TRelation(BaseModelAlias, BTEdge):
     source: str = field()
     target: str = field()
     description: str = field()
+    property: Optional[str] = field(default=None)
     chunks: List[THash] | None = field(default=None)
 
     @staticmethod
@@ -169,6 +170,7 @@ class TRelation(BaseModelAlias, BTEdge):
             assert edges is None, "Either edge or edges should be provided, not both"
             return {
                 "description": edge.description,
+                "property": edge.property,
                 "chunks": edge.chunks,
                 **(
                     {
@@ -182,6 +184,7 @@ class TRelation(BaseModelAlias, BTEdge):
         elif edges is not None:
             return {
                 "description": [e.description for e in edges],
+                "property": [e.property for e in edges],
                 "chunks": [e.chunks for e in edges],
                 **(
                     {
@@ -200,10 +203,16 @@ class TRelation(BaseModelAlias, BTEdge):
         target: str = Field(..., description="Name of the target entity")
         # alternative description "Explanation of why the source entity and the target entity are related to each other"
         desc: str = Field(..., description="Description of the relationship between the source and target entity")
-
+        property: Optional[str] = Field(..., description="Property from the original ontology that is the best guess as to this relationship")
+        
         @staticmethod
         def to_dataclass(pydantic: "TRelation.Model") -> "TRelation":
-            return TRelation(source=pydantic.source, target=pydantic.target, description=pydantic.desc)
+            return TRelation(
+                source=pydantic.source, 
+                target=pydantic.target, 
+                description=pydantic.desc,
+                property=pydantic.property
+            )
 
         @field_validator("source", mode="before")
         @classmethod

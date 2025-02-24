@@ -6,57 +6,82 @@ PROMPTS: Dict[str, Any] = {}
 
 ## NEW
 PROMPTS["entity_relationship_extraction"] = """# DOMAIN PROMPT
+
+Here is the ontology in OWL (TTL) format:
 {domain}
 
 # GOAL
-Your goal is to highlight information that is relevant to the domain and the questions that may be asked on it.
-Given an input document, identify all relevant entities and all relationships among them.
+Your goal is to highlight information that is relevant to the ontology and the questions that may be asked on it.
+Given an input document, identify all relevant entities and all relationships among them. 
+For each entity, you must find the class in the ontology that best matches the entity.  Do not make up your own classes, and do not use "UNKNOWN" or "OTHER".
 
 Examples of possible questions:
 {example_queries}
 
 # STEPS
-1. Identify all entities of the given types. Make sure to extract all and only the entities that are of one of the given types. Use singular names and split compound concepts when necessary (for example, from the sentence "they are movie and theater directors", you should extract the entities "movie director" and "theater director").
-2. Identify all relationships between the entities found in step 1. Clearly resolve pronouns to their specific names to maintain clarity.
-3. Double check that each entity identified in step 1 appears in at least one relationship. If not, add the missing relationships.
+1. Identify all entities that are members of classes in the domain description. Make sure to extract all and only the entities that are of one of the classes defined in the ontology. Use singular names and split compound concepts when necessary (for example, from the sentence "they are movie and theater directors", you should extract the entities "movie director" and "theater director").
+2. Identify all relationships between the entities found in step 1. Clearly resolve pronouns to their specific names to maintain clarity. Use properties from the ontology whenever you can.  
+3. If you find relationships that are not defined in the ontology, provide a description of the relationship.
+4. Double check that each entity identified in step 1 appears in at least one relationship. If not, add the missing relationships.
+
 
 # EXAMPLE DATA
-Example types: [location, organization, person, communication]
+Example ontology: ex:Location a owl:Class. ex:Organization a owl:Class. ex:Person a owl:Class. ex:Communication a owl:Class. 
+                  ex:locatedIn a owl:ObjectProperty. ex:broadcastsIn a owl:ObjectProperty. ex:speaks a owl:ObjectProperty. ex:offers a owl:ObjectProperty. ex:launched a owl:ObjectProperty.
 Example document: Radio City: Radio City is India's first private FM radio station and was started on 3 July 2001. It plays Hindi, English and regional songs. Radio City recently forayed into new media in May 2008 with the launch of a music portal - PlanetRadiocity.com that offers music related news, videos, songs, and other music-related features."
+
+
+
+
 
 Output:
 {{
 "entities": [
-	{{"name": "RADIO CITY", "type": "organization", "desc": "Radio City is India's first private FM radio station"}},
-	{{"name": "INDIA", "type": "location", "desc": "A country"}},
-	{{"name": "FM RADIO STATION", "type": "communication", "desc": "A radio station that broadcasts using frequency modulation"}},
+	{{"name": "RADIO CITY", "rdf:type": "ex:organization", "desc": "Radio City is India's first private FM radio station"}},
+	{{"name": "INDIA", "rdf:type": "ex:location", "desc": "A country"}},
+	{{"name": "FM RADIO STATION", "rdf:type": "ex:communication", "desc": "A radio station that broadcasts using frequency modulation"}},
+
 	{{"name": "ENGLISH", "type": "communication", "desc": "A language"}},
 	{{"name": "HINDI", "type": "communication", "desc": "A language"}},
 	{{"name": "NEW MEDIA", "type": "communication", "desc": "New media"}},
 	{{"name": "PLANETRADIOCITY", "type": "organization", "desc": "PlanetRadiocity.com is an online music portal"}},
-	{{"name": "MUSIC PORTAL", "type": "communication", "desc": "A website that offers music related information"}},
-	{{"name": "NEWS", "type": "communication", "desc": "News"}},
-	{{"name": "VIDEO", "type": "communication", "desc": "Video"}},
-	{{"name": "SONG", "type": "communication", "desc": "Song"}}
+	{{"name": "MUSIC PORTAL", "subclassOf": "ex:Channel", "desc": "A website that offers music related information"}},
+	{{"name": "NEWS", "subclassOf": "ex:communication", "desc": "News"}},
+	{{"name": "VIDEO", "subclassOf": "ex:communication", "desc": "Video"}},
+	{{"name": "SONG", "subclassOf": "ex:communication", "desc": "Song"}}
+
 ],
 "relationships": [
-	{{"source": "RADIO CITY", "target": "INDIA", "desc": "Radio City is located in India"}},
-	{{"source": "RADIO CITY", "target": "FM RADIO STATION", "desc": "Radio City is a private FM radio station started on 3 July 2001"}},
-	{{"source": "RADIO CITY", "target": "ENGLISH", "desc": "Radio City broadcasts English songs"}},
-	{{"source": "RADIO CITY", "target": "HINDI", "desc": "Radio City broadcasts songs in the Hindi language"}},
-	{{"source": "RADIO CITY", "target": "PLANETRADIOCITY", "desc": "Radio City launched PlanetRadiocity.com in May 2008"}},
-	{{"source": "PLANETRADIOCITY", "target": "MUSIC PORTAL", "desc": "PlanetRadiocity.com is a music portal"}},
-	{{"source": "PLANETRADIOCITY", "target": "NEWS", "desc": "PlanetRadiocity.com offers music related news"}},
-	{{"source": "PLANETRADIOCITY", "target": "SONG", "desc": "PlanetRadiocity.com offers songs"}}
+	{{"source": "RADIO CITY", "target": "INDIA", "desc": "Radio City is located in India", "property": "ex:locatedIn"}},
+	{{"source": "RADIO CITY", "target": "FM RADIO STATION", "desc": "Radio City is a private FM radio station started on 3 July 2001", "property": "ex:type"}},
+
+	{{"source": "RADIO CITY", "target": "ENGLISH", "desc": "Radio City broadcasts English songs", "property": "ex:broadcastsIn"}},
+
+
+	{{"source": "RADIO CITY", "target": "HINDI", "desc": "Radio City broadcasts songs in the Hindi language", "property": "ex:broadcastsIn"}},
+
+	{{"source": "RADIO CITY", "target": "PLANETRADIOCITY", "desc": "Radio City launched PlanetRadiocity.com in May 2008", "property": "ex:launched"}},
+	{{"source": "PLANETRADIOCITY", "target": "MUSIC PORTAL", "desc": "PlanetRadiocity.com is a music portal", "property": "rdf:type"}},
+
+
+
+
+	{{"source": "PLANETRADIOCITY", "target": "NEWS", "desc": "PlanetRadiocity.com offers music related news", "property": "ex:offers"}},
+	{{"source": "PLANETRADIOCITY", "target": "SONG", "desc": "PlanetRadiocity.com offers songs", "property": "ex:offers"}},
+	{{"source": "PLANETRADIOCITY", "target": "VIDEO", "desc": "PlanetRadiocity.com offers music related videos", "property": "ex:offers"}}
+
+
+
+
 ],
 "other_relationships": [
-	{{"source": "RADIO CITY", "target": "NEW MEDIA", "desc": "Radio City forayed into new media in May 2008."}},
-	{{"source": "PLANETRADIOCITY", "target": "VIDEO", "desc": "PlanetRadiocity.com offers music related videos"}}
+	{{"source": "RADIO CITY", "target": "NEW MEDIA", "desc": "Radio City forayed into new media in May 2008.", "property": "ex:newProperty"}},
+
 ]
 }}
 
 # INPUT DATA
-Types: {entity_types}
+
 Document: {input_text}
 
 Output:

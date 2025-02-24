@@ -1,0 +1,337 @@
+Editor's note, May 15: Early versions of this printer were recalled due to a potential hazard with the print bed cable. My review unit showed no sign of the fault as it seems to happen only in specific circumstances. You should be free to purchase a new A1 without this issue from now on.
+
+It's been an amazing few years for 3D printing. The advent of a new breed of fast 3D printers that can offer superb quality at a reasonable price has opened the door to many new people. These printers are technically excellent while being easy to use by people without technical ability.
+
+The A1 Combo is perhaps the best example of a modern 3D printer that I've seen. It is -- and I say this with no hyperbole -- the best consumer 3D printer I have ever used, and it's as close to a perfect 10 as a product can be. Only a few small issues keep it from that perfect score, and none of them should deter you from getting one.
+
+The base of an A1 3D printer showing the placement of the screw holes
+
+The A1 required no technical skill to put together. If you have ever set up a paper printer or put together a floor lamp, you have the skill needed to set up this 3D printer. All it took was to remove a plastic cover, put the base in place on the gantry and screw the screws into the holes marked in green. The final part was to connect some plastic tubing and the power from the AMS color system and the printer itself. Incredibly simple.
+
+The software setup is almost as easy. Bambuslicer is simple to download and not too difficult to use, and the Bambu Handy app is clear and easy to follow. I love a good companion app, especially when it isn't flooded with advertisements. Bambu Handy allows you to monitor the print as it happens -- it can even record time lapse as the model prints -- and lets you browse Bambu Lab's Makerworld, a repository of models you can download and print.
+
+
+Bambu Lab A1 specifications
+Build volume (mm)	256 x 256 x 256
+Nozzle type	Quick Swap stainless steel
+Max nozzle temperature	300 deg C
+Build plate max temperature	100 deg C
+Official max speed	500mm/s
+Typical speed	200 - 300mm/s
+Supported material	PLA, PETG, TPU, PVA
+Connectivity	Wi-Fi, USB
+Slicer	Bambu Slicer
+While the A1 Combo at $549 is my recommendation, it's possible to buy them separately. The A1 is a solid printer on its own and is perhaps the best budget 3D printer around today. Its $400 price tag makes it a little more expensive than some of the others in that class, but it's still worth the price. The AMS Lite is a further $250, so while you can buy them separately, it'll cost you an extra $100 in the long run.
+
+The A1 specs are on par with the current crop of best fast 3D printers. The layout is Cartesian -- the bed moves forward and back as the model prints, instead of CoreXY -- the bed moves only up and down – like the company's other printers (the P1S and X1 Carbon). The print volume is 256 by 256 by 256mm with an official print speed of 500 millimeters per second. At no point can this printer actually print at that speed though. The fastest it can go without looking terrible is around 300mm/s, which is still faster than a lot of the competition.
+
+Quality without compromise
+Green, red, and gold aztec dragons on a wooden table
+
+Quality and speed are often at odds. The faster you go with a 3D printer, the more the quality suffers, and this has been true for the last decade. Bambu Lab helped change that premise with the X1 Carbon and P1P and has continued the trend with the A1 mini and now the A1. You can now get the same quality print from this $500 printer at 300mm/s as you would have got from a $900 machine at 75mm/s three years ago. It's an amazing leap, and one that I welcome.
+
+The A1, even without the AMS, is capable of stunning prints at high speed. I found the sweet spot to be around 200mm/s for the best quality. You can go faster, but if the model is tall, you run the risk of it shaking off the build plate or if you're printing in color, faster speeds can cause layer skipping. As you can see from the Aztec dragons from Fotis Mint, the details stand out in sharp relief. I've printed in excess of 50 models on this machine by now and they are almost universally excellent. 
+
+The A1 also has quick swap nozzles that can help you print even faster. With a 0.6mm nozzle instead of the standard 0.4mm, you can push more plastic through in a hurry. There are even 0.8mm nozzles that you can use to make strong parts that don't need to look pretty and all the nozzles take a few seconds to change. It's another way the A1 feels fast more user friendly than before. You no longer need a wrench and risk breaking parts to remove a nozzle. You just unclip it, throw it away and replace it. 
+
+Bring color into your life
+2 Santa skulls with beards and santa hats
+
+The A1 is a good printer on its own, but the AMS Lite system that comes with the combo is what elevates the whole to a near-perfect product. It's also, interestingly enough, the biggest reason it isn't a perfect machine. 
+
+
+AMS stands for Automatic Material System and it's what lets you print different colors on the A1. The Lite version that comes with the A1 doesn't have an enclosure like the P and X series AMS, but it works in a similar way. Using the packaged software, you can "paint" the surface of your model, and the AMS will feed up to four different colors into your printer to match. This gives you a lot of scope for making prints that look finished without needing to paint them. 
+
+I have spent a lot of time using the A1 and A1 Mini with the AMS Lite and packaged together they are incredibly powerful. Like the Mini, the A1 combo feels almost completely plug-and-play in a way that so few printers have before. In all my years of using 3D printers, nothing comes close to the ease of use that comes from these two machines working in tandem. The AMS could stand to be a little more sturdy, and I think the tubes between it and the A1 are too short (it makes it hard to load the filament), but it does work very well at making multicolor prints.
+
+What a waste
+A potion bottle covered in the filament waste it took to print it
+
+The A1 Combo's biggest selling point is also its biggest point of failure. The AMS, when printing multiple colors produces waste. This waste comes from purging the filament so that you get nice transitions between the colors. This produces what is commonly known as "printer poop," and as you can see, it produces a lot of it. On some prints, the waste outweighs the completed model, and that's just not sustainable. You can mitigate it by editing the values and maybe printing another model using the purged material, but you'll never truly get rid of it. If you are printing with PLA, it's not so bad as it's biodegradable if you compost it correctly, but any other material is going to create a lot of waste plastic that isn't going anywhere. 
+
+The waste isn't the biggest issue though. After all, a commercial disposable lid factory will likely make more plastic waste than hobbyist 3D printers could ever hope to generate, but the waste does highlight my least favorite part of the machine: the "poop flinger."
+
+A broken 3D print on the A1 Combo
+
+The poop flinger, or waste cutter to give it the proper name, is a pain point in every way. It's a tiny little blade that is supposed to scrape the filament from the nozzle then a spring flings the bundle away to the left side of the machine. Not only is this messy if you don't have a pot to catch it, but it's also effective maybe only 60% of the time. The other 40% of the time, the waste sticks to the nozzle and either gets caught on the purge tower -- another waste block that's required to color print on the A1 -- or on the model itself. Having plastic where it shouldn't be is the major cause of layer shifts and fails and equates to almost all of my frustration with the A1. 
+
+
+The model you can see in the image here was supposed to have four colors: pink, claret, gold and marble for the moon. Because the poop flinger is unable to correctly clear the filament it kept knocking over the purge tower or causing layer shifts in the model itself. By the time I managed to get a complete model, I had used three-quarters of two of the colors and about a quarter each of the other two. That's around 2 kilograms, or 4 pounds, of material to make this one 250-gram model. It was enormously frustrating. 
+
+Still the best despite the issues
+
+The problems highlighted above are frustrating, but not enough to change my outlook on this machine. Like the A1 Mini Combi before it, the A1 Combo is a 3D printer that you can't help but admire. It's the bridge between those of us who love to tinker and already enjoy the 3D printing space and those who want to try 3D printing without all of the finicky engineering that goes along with it. With the A1 Combo, you can have stunning prints with very little effort at a price that's worth every penny.
+
+
+
+Budget Printer
+
+Best Budget 3D Printers of 2025
+
+There's a lot you can do with 3D printing, especially if you're creative. And good news! You don’t have to spend a lot of money to get a quality 3D printer. Here are the best budget 3D printers on the market.
+
+Our Experts
+Headshot of James Bricknell
+Written by 
+James Bricknell
+Our expert, award-winning staff selects the products we cover and rigorously researches and tests our top picks. If you buy through our links, we may get a commission.
+
+
+How we test
+CNET’s expert staff reviews and rates dozens of new products and services each month, building on more than a quarter century of expertise.
+
+
+Table of Contents
+
+
+Best Budget 3D Printers of 2025
+What's the best budget 3D printer?
+Best budget 3D printers
+Best color-ready 3D printer
+Best moddable budget 3D printer
+Fast and stable budget 3D printer (Update: Out of stock)
+Fastest budget 3D printer (Update: Currently unavailable)
+Best budget resin 3D printers
+Best joint budget 3D printer
+Best starter resin printer
+Best midsize budget 3D printer
+Budget 3D printer FAQ
+How we test 3D printers
+Our Picks
+Image of Bambu Lab A1 Mini Combo 
+Best color-ready 3D printer
+Bambu Lab A1 Mini Combo
+$199 at Bambu Lab
+View details
+flashforge-adventurer-5m-commerce.jpg
+Best moddable budget 3D printer
+Flashforge Adventurer 5M
+$279 at Flashforge
+View details
+The M5C 3D printer on a blue background
+Fast and stable budget 3D printer (Update: Out of stock)
+AnkerMake M5C
+$200 at Amazon
+View details
+Image of Anycubic Kobra 2 (Update: Out of stock)
+Fastest budget 3D printer (Update: Currently unavailable)
+Anycubic Kobra 2 (Update: Out of stock)
+$169 at Anycubic
+View details
+The Neptune 4 Pro 3D printer on a blue background
+Best joint budget 3D printer
+Elegoo Neptune 4 Pro
+$230 at Elegoo
+View details
+Show 2 more
+If you're the creative type, a 3D printer is one of the best things you can own. Whether you want to whip up something for cosplay or fix an old tool that's missing a part, a 3D printer is great. It's also an incredible piece of equipment to use when you want to experiment and come up with something quirky. Whether you're new to 3D printing or you've wanted to invest in a printer for a while, there's good news: They don't cost an arm and a leg anymore, and you can get excellent print quality and details without busting your budget.
+
+But before you jump into the deep end and start shopping, it's a good idea to think about what you want to build with a 3D printer. Small statues to give as gifts, and epic pieces of costume armor, scratch the surface. The options are pretty much unlimited. You can even start an Etsy shop and sell your wares -- grab a couple of printers, and you'll be well on your way to making some cash from your hobby.
+
+We tested the top affordable 3D printer options, to help you find a good one.
+
+What's the best budget 3D printer?
+Budget 3D printing is a growing category. For your money, the best you can buy is the Anycubic Kobra 2 (it is currently out of stock, so keep checking back). The affordable printer has enough upgraded features to make it an incredibly useful machine. Its price was recently slashed to $169 from its previously firm-set price range of $250-$280. Having such excellent print quality in a budget printer makes it an ideal choice.
+
+These budget 3D printers all cost under $500 (although prices can drift a bit from month to month), and some are better suited for beginners than others. Our list of picks for the best 3D printer overall covers a much wider range of choices, but these are excellent for getting started -- or for buying several at once. If you are thinking of creating a print farm, then buying several Anycubic Kobra 2 is an excellent way to get started.
+
+Best budget 3D printers
+
+Product image
+$199 at Bambu Lab
+Pros
+The best setup experience
+4-color printing on a budget
+Good app experience
+Suprisingly fast
+Cons
+No real modification path
+AMS Lite is wobbly
+Awkward shape and footprint
+Best color-ready 3D printer
+Bambu Lab A1 Mini Combo
+The A1 Mini Combo is an almost perfect entry to the world of color 3D printing. It's well priced, and while the build area is small, the quality of the print -- and the fact you can print in four colors straight out of the box -- is amazing. If you're looking for your first printer and want to try color printing, this is a no-brainer.
+
+
+flashforge-adventurer-5m-commerce.jpg
+$279 at Flashforge
+Pros
+Great price for a CoreXY
+Great quality
+Excellent networking
+Cons
+Spool holder on the back
+Material type
+Filament
+Build area (mm)
+220 x 220 x 220
+Official max printing speed (mm/s)
+600
+Dimensions (mm)
+363 x 402 x 488
+Price
+$$
+Best moddable budget 3D printer
+Flashforge Adventurer 5M
+The Adventurer 5M and the 5M Pro are two excellent 3D printers from Flashforge. They aren't fancy, and you can see they take heavy influence from the P series from Bambu Lab -- but what they do, they do well, and they do it at an enticing price. A solid CoreXY printer that can print solidly at 300mm/s is not to be sniffed at and one that's under $300 is well worth your time. I especially like the Flashprint software that allows you to network several printers at the same time effortlessly. Great for schools and small print farms.
+
+
+
+The M5C 3D printer on a blue background
+$200 at Amazon
+Pros
+Excellent app
+great build quality
+All metal hot end
+Cons
+No display
+Material type
+Filament
+Build area (mm)
+220 × 220 × 250
+Official max printing speed (mm/s)
+500 (fast mode), 250 (standard)
+Dimensions (mm)
+466 × 374 × 480
+Price
+$$
+Fast and stable budget 3D printer (Update: Out of stock)
+AnkerMake M5C
+Anker did way more than take its excellent M5 printer and remove a few things to create a budget-friendly model. In fact, there are a couple of ways in which this budget bed-slinger improved over the original. The slightly smaller build platter offers guard rails so it's much easier to get it on and off the heated base. The camera and display have been removed, but the AnkerMake app is one of the best pieces of software available for any 3D printer and has a much nicer interface. Perhaps best of all, the new all-metal hot-end means it can handle a larger array of materials when printing. At its core, it's still a rock-solid printer with some of the most user-friendly apps you can get today.
+
+
+Product image
+$169 at Anycubic
+Pros
+Excellent value
+Huge part-cooling fan
+Fast for the price
+Cons
+Slicer is lacking
+Fastest budget 3D printer (Update: Currently unavailable)
+Anycubic Kobra 2 (Update: Out of stock)
+While not as fast as the P1P or the X1C from the best 3d printer list, the Kobra 2 is around the same maximum speed as the AnkerMake M5. It will happily produce prints at 250 millimeters per second, although the best output quality seems to be hovering around 150mm/s in my testing. It also comes with a filament runout sensor and bed leveling, which works extremely well.
+
+As the best budget 3D printer, the big selling point for the Kobra 2 is the price. It has all the advantages of a faster printer but with a sub-$300 price tag, which is astonishing. This is my recommendation for any first-time buyer or someone on a budget.
+
+
+Best budget resin 3D printers
+
+Most beginner printers use a plastic filament to create models, but plenty of affordable resin 3D printers are available, too. Liquid resin is a little more difficult to use than standard 3D printing material and requires safety equipment, but it also produces amazingly detailed results.
+
+Show less
+
+The Neptune 4 Pro 3D printer on a blue background
+$230 at Elegoo
+$360 at Amazon
+Pros
+Great quality prints
+Bed leveling system is great
+Giant cooling fan
+Cons
+Can get a little wobbly at high speed
+Material Type
+Filament
+Build Area (mm)
+225 x 225 x 265
+Official max printing speed (mm/s)
+500
+Dimensions (mm)
+475 x 445 x 515
+Price
+$
+Best joint budget 3D printer
+Elegoo Neptune 4 Pro
+The Elegoo is one of my favorite ultracheap printers. When testing it, I kept expecting it to fail, and it just didn't. It produced amazing results for the price and continues to do so every time I use it. Whether you buy the Anycubic Kobra 2 or the Elegoo Neptune 4 Pro, you are getting the best budget 3D printer for under $300.
+
+
+
+elegoo mars 3 on a blue background
+See at Amazon
+Pros
+Amazing price
+Amazing quality
+Cons
+Small build area
+Material type
+Resin
+Build area (mm)
+143 x 89 x 175
+Official max printing speed (Layer time in seconds)
+1.5 - 3
+Dimensions (mm)
+227 x 227 x 439
+Price
+$
+Best starter resin printer
+Elegoo Mars 3 (Update: Out of stock)
+This small resin printer is a popular option from Elegoo's Mars line. Because of the 4K monochrome LCD (these printers use light from an LCD to cure liquid resin), it can print much faster than older printers. Standard 3D printing simply can't reproduce the level of detail on models. At this price, the Elegoo Mars 3 is the best resin printer for the money.
+
+
+Product image
+$210 at Elegoo
+Best midsize budget 3D printer
+Elegoo Saturn 2 (Update: Out of Stock)
+The Elegoo Saturn 2 is my favorite resin printer right now. Its high-speed printing doesn't sacrifice print quality. The bed size is much larger than the printers in the smaller category, while its footprint is much easier to deal with than other, larger printers. You can print finely detailed cosplay pieces or multiple tabletop miniatures with equal ease with the Saturn 2, making it perfect for a small business. 
+Read more: Elegoo Saturn 2 Review
+
+
+Different models printed on the Max
+James Bricknell/CNET
+Budget 3D printer FAQ
+
+What material should I use to print with?
+Most home 3D printers use PLA or ABS plastic. Professional printers can use all sorts of materials, from metal to organic filament. Some printers use a liquid resin, which is much more difficult to handle but offers sharper details. As a beginner, use PLA. It's nontoxic, made mostly of cornstarch and sugarcane, handles easily and is inexpensive. It's also more sensitive to heat, so don't leave your 3D prints on the dashboard of a car on a hot day. 
+
+Show less
+What settings should I use?
+Most 3D printers include or link to recommended software, which can handle converting 3D STL or other files into formats supported by the printer. Stick with the suggested presets to start -- with one exception. I've started adding a raft, or bottom layer of filament, to nearly everything I print. It has cut down dramatically on prints that don't adhere to the bed properly, which is a common issue. If you continue to have problems, rub a standard glue stick on the print bed right before printing.
+
+Show less
+What are supports?
+Your 3D models probably need some help to print properly, as these printers don't do well with big overhangs -- for example, an arm sticking out from a figure. Your 3D printer software can usually automatically calculate and add supports, meaning little stands that hold up all those sticking-out parts of the model. After the print is done, clip the supports off with micro cutters and file down any nubs or rough edges with hobby files. 
+
+Show less
+
+How we test 3D printers
+
+4 3d printed models that show errors from 3D printing
+James Bricknell/CNET
+Testing 3D printers is an in-depth process. Printers often don't use the same materials, or even the same process to create models. I test SLA 3D printers that use resin and light to print, and FDM printers that melt plastic onto a plate. Each has a unique methodology. Core qualifiers I look at include:
+
+Hardware quality
+Ease of setup
+Bundled software 
+Appearance and accuracy of prints
+Repairability
+Company and community support
+A key test print, representing the (now old) CNET logo, is used to assess how a printer bridges gaps, creates accurate shapes and deals with overhangs. It even has little towers to help measure how well the 3D printer deals with temperature ranges.
+
+When testing print speed, we slice the model using the standard slicer the machine is shipped with on its standard settings, then compare the real-world duration of the print to the statement completion time on the slicer. 3D printers often use different slicers, and those slicers can vary wildly on what they believe the completion time to be. 
+
+We then use PrusaSlicer to determine how much material the print should use and divide that number by the real-world time it took to print to give us a more accurate number for the speed in millimeters per second (mm/s) the printer can run at.
+
+An infrared heat map of a 3D printer build plate
+James Bricknell / CNET
+Every build plate is supposed to heat up to a certain temperature so we use the InfiRay thermal imaging camera for Android to check how well they do. We set the build plate to 60 degrees Celsius -- the most used temperature for build plates -- waited 5 minutes for the temperature to stabilize, and then measured it in six separate locations. We then took the average temperature to see how close the 3D printer got to the advertised temperature.
+
+Testing resin printers requires different criteria, so I use the Ameralabs standard test: printing out a small resin model that looks like a tiny town. This helps determine how accurate the printer is, how it deals with small parts and how well the UV exposure works at different points in the model. 
+
+Many other anecdotal test prints, using different 3D models, are also run on each printer to test the longevity of the parts and how well the machine copes with various shapes.
+
+For the other criteria, I researched the company to see how well it responds to support queries from customers and how easy it is to order replacement parts and install them yourself. Kits (printers that come only semi-assembled) are judged by how long and difficult the assembly process is and how clear the instructions are.
+
+Show less
+Computing Guides
+Laptops
+
+Desktops & Monitors
+
+Computer Accessories
+
+Photography
+
+Tablets & E-Readers
+
+3D Printers
+

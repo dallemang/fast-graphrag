@@ -1,0 +1,30 @@
+@prefix owl: <http://www.w3.org/2002/07/owl#> .
+@prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> .
+@prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+@prefix xsd: <http://www.w3.org/2001/XMLSchema#> .
+@prefix pr: <https://models.data.world/tutorial/printers/> .
+
+pr:Component rdfs:label "Component" ; a owl:Class .
+
+pr:Printer3D a owl:Class ; rdfs:label "3D Printer" ; rdfs:subClassOf pr:Component ;
+.
+
+pr:hasPart a owl:ObjectProperty ; rdfs:domain pr:Component ; rdfs:range pr:Component ; rdfs:label "has part" .
+
+
+pr:Material a owl:Class ; rdfs:label "Material" .
+
+pr:Color a owl:Class ; rdfs:label "Color" .
+
+pr:availbleIn a owl:ObjectProperty ; rdfs:range pr:Color; rdfs:domain pr:Material . 
+
+pr:uses a owl:ObjectProperty ; rdfs:domain pr:Printer3D ; rdfs:range pr:Material ; rdfs:label "uses"  .
+
+pr:Nozzle a owl:Class ; rdfs:label "nozzle" ; rdfs:subClassOf pr:Component .
+
+
+pr:App a owl:Class ; rdfs:label "application" ; rdfs:comment "An App is an application that supports management and control of printers" .
+
+pr:supports a owl:ObjectProperty ; rdfs:domain pr:App; rdfs:range pr:Printer3D ; rdfs:label "supports" .
+
+

@@ -1,0 +1,30 @@
+prefix owl: <http://www.w3.org/2002/07/owl#> 
+prefix rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#> 
+prefix rdfs: <http://www.w3.org/2000/01/rdf-schema#> 
+prefix skos: <http://www.w3.org/2004/02/skos/core#>
+PREFIX gr: <https://models.data.world/graphrag/>
+
+DELETE {
+  GRAPH gr:output {
+    ?s ?p ?o
+  }
+}
+INSERT {
+  GRAPH gr:output {
+    ?o ?p ?s .
+    owl:Thing gr:record ?reason .
+  }
+}
+WHERE {
+  GRAPH gr:ontology {
+    ?p rdfs:range ?domain .    # Find properties with domain/range first
+    ?p rdfs:domain ?range .
+    
+    GRAPH gr:output {          # Then find triples that violate them
+      ?s ?p ?o .
+      ?s a ?domain .
+      ?o a ?range
+    }
+    BIND (CONCAT (str(?o), str(?p), str(?s), "REPLACES", str(?s), str(?p), str(?o)) AS ?reason)
+  }
+}

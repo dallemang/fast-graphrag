@@ -1,17 +1,18 @@
 """Entity-Relationship extraction module."""
 import asyncio
 import re
-from dataclasses import dataclass
-from typing import Dict, Iterable, List, Literal, Optional
+from dataclasses import dataclass, field
+from typing import Dict, Iterable, List, Literal, Optional, Callable
 
 from pydantic import BaseModel, Field
-
+from rdflib import URIRef
 from fast_graphrag._llm import BaseLLMService, format_and_send_prompt
 from fast_graphrag._models import TQueryEntities
 from fast_graphrag._storage._base import BaseGraphStorage
 from fast_graphrag._storage._gdb_igraph import IGraphStorage, IGraphStorageConfig
 from fast_graphrag._types import GTId, TChunk, TEntity, TGraph, TRelation
 from fast_graphrag._utils import logger
+from fast_graphrag._policies._base import BaseGraphUpsertPolicy
 
 from ._base import BaseInformationExtractionService
 
@@ -25,6 +26,10 @@ class TGleaningStatus(BaseModel):
 @dataclass
 class DefaultInformationExtractionService(BaseInformationExtractionService[TChunk, TEntity, TRelation, GTId]):
     """Default entity and relationship extractor."""
+
+    graph_upsert: BaseGraphUpsertPolicy[TEntity, TRelation, GTId]
+    max_gleaning_steps: int = 0
+    resolve_curie: Callable[[str], Optional[URIRef]] = None
 
     def extract(
         self,
@@ -130,15 +135,22 @@ class DefaultInformationExtractionService(BaseInformationExtractionService[TChun
             format_kwargs=prompt_kwargs,
             response_model=TGraph,
         )
+        
+        logger.info("\nExtracted Graph:")
+        logger.info(f"Entities: {chunk_graph.entities}")
+        logger.info(f"Relationships: {chunk_graph.relationships}")
 
         # Do gleaning
         chunk_graph_with_gleaning = await self._gleaning(llm, chunk_graph, history)
         if chunk_graph_with_gleaning:
             chunk_graph = chunk_graph_with_gleaning
 
-        _clean_entity_types = [re.sub("[ _]", "", entity_type).upper() for entity_type in entity_types]
         for entity in chunk_graph.entities:
-            if re.sub("[ _]", "", entity.type).upper() not in _clean_entity_types:
+            if ':' in entity.type:
+                resolved_type = self.resolve_curie(entity.type)
+                if resolved_type is None:
+                    entity.type = "UNKNOWN"
+            elif entity.type.lower() not in [et.lower() for et in entity_types]:
                 entity.type = "UNKNOWN"
 
         # Assign chunk ids to relationships
