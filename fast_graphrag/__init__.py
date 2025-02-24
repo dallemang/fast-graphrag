@@ -116,6 +116,7 @@ class GraphRAG(BaseGraphRAG[TEmbedding, THash, TChunk, TEntity, TRelation, TId])
             entity_storage=self.config.entity_storage,
             chunk_storage=self.config.chunk_storage,
             entity_ranking_policy=self.config.entity_ranking_policy,
+            relation_ranking_policy=self.config.relation_ranking_policy,
             chunk_ranking_policy=self.config.chunk_ranking_policy,
             node_upsert_policy=self.config.node_upsert_policy,
             edge_upsert_policy=self.config.edge_upsert_policy,
