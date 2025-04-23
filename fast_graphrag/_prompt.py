@@ -13,13 +13,16 @@ Here is the ontology in OWL (TTL) format:
 # GOAL
 Your goal is to highlight information that is relevant to the ontology and the questions that may be asked on it.
 Given an input document, identify all relevant entities and all relationships among them. 
-For each entity, you must find the class in the ontology that best matches the entity.  Do not make up your own classes, and do not use "UNKNOWN" or "OTHER".
+For each entity, you must find the class in the ontology that best matches the entity.  Do not make up your own types or classes, and do not use "UNKNOWN" or "OTHER".
 
 Examples of possible questions:
 {example_queries}
 
 # STEPS
-1. Identify all entities that are members of classes in the domain description. Make sure to extract all and only the entities that are of one of the classes defined in the ontology. Use singular names and split compound concepts when necessary (for example, from the sentence "they are movie and theater directors", you should extract the entities "movie director" and "theater director").
+1. Identify all entities that are members of classes in the domain description.
+Extract all entities in a list (for example, from the sentence "they come in red, blue, orange, yellow, purple and pink" extract all the entities red, blue, orange, yellow, purple and pink)
+Make sure to extract all and only the entities that are of one of the classes defined in the ontology.
+Use singular names and split compound concepts when necessary (for example, from the sentence "they are movie and theater directors", you should extract the entities "movie director" and "theater director").
 2. Identify all relationships between the entities found in step 1. Clearly resolve pronouns to their specific names to maintain clarity. Use properties from the ontology whenever you can.  
 3. If you find relationships that are not defined in the ontology, provide a description of the relationship.
 4. Double check that each entity identified in step 1 appears in at least one relationship. If not, add the missing relationships.

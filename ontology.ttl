@@ -28,3 +28,4 @@ pr:App a owl:Class ; rdfs:label "application" ; rdfs:comment "An App is an appli
 pr:supports a owl:ObjectProperty ; rdfs:domain pr:App; rdfs:range pr:Printer3D ; rdfs:label "supports" .
 
 
+pr:3DPrintOntology a owl:Ontology; rdfs:label "3D Printers" .
