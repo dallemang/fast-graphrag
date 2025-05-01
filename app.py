@@ -682,10 +682,10 @@ def upload_page():
             timeout=1800  # 30 minutes timeout
         )
         
-        logger.info(f"Queued processing job with ID: {job_id}")
+        logger.info(f"Queued processing job with ID: {job_id} for version: {version}")
         
-        # Redirect to the waiting page
-        return redirect(f'/job/{job_id}/wait')
+        # Redirect to the waiting page, passing the version as a query parameter
+        return redirect(f'/job/{job_id}/wait?version={version}')
             
     # Display the upload form (GET request)
     logger.info("Preparing to render upload form")
@@ -889,7 +889,8 @@ def job_wait_page(job_id):
     # Determine if we should redirect to results
     if status == 'completed':
         filename = job_info.get('filename', '')
-        return redirect(f'/job/{job_id}/result')
+        version = request.args.get('version', '')
+        return redirect(f'/job/{job_id}/result?version={version}')
     
     # Determine page refresh rate based on status
     refresh_rate = 5  # Default 5 seconds
@@ -984,7 +985,7 @@ def job_wait_page(job_id):
             
             {f'<pre>{job_info.get("traceback", "")}</pre>' if status == 'error' and 'traceback' in job_info else ''}
             
-            {f'<p><a href="/job/{job_id}/result">View Results</a></p>' if status == 'completed' else ''}
+            {f'<p><a href="/job/{job_id}/result?version={request.args.get("version", "")}">View Results</a></p>' if status == 'completed' else ''}
             {f'<p>This page will automatically refresh every {refresh_rate} seconds until processing is complete.</p>' if refresh_rate > 0 else ''}
         </div>
     </body>
@@ -998,6 +999,13 @@ def job_result_page(job_id):
     job_info = get_job_status(job_id)
     status = job_info.get('status', 'unknown')
     
+    # If we have a job but no version info, try to get it from the request
+    if 'version' not in job_info or not job_info.get('version'):
+        version_param = request.args.get('version', '')
+        if version_param:
+            job_info['version'] = version_param
+            logger.info(f"Added version '{version_param}' from request to job info")
+    
     if status != 'completed' and status != 'error':
         return redirect(f'/job/{job_id}/wait')
     
@@ -1007,6 +1015,8 @@ def job_result_page(job_id):
     local_output = job_info.get('local_output', '')
     uploaded = job_info.get('uploaded_to_dataworld', False)
     version = job_info.get('version', '')
+    
+    logger.info(f"Job result page for job_id={job_id}, version='{version}', status={status}, job_info keys: {list(job_info.keys())}")
     
     status_class = "success" if status == 'completed' else "error"
     status_color = "green" if status == 'completed' else "red"
@@ -1075,7 +1085,8 @@ def job_result_page(job_id):
         
         <div>
             {f'<a href="/download/{filename}" class="button">Download Result</a>' if filename and local_output else ''}
-            {f'<a href="/upload?version={version}" class="button">Process Another Document</a>' if version else '<a href="/" class="button">Process Another Document</a>'}
+            <a href="/upload{f'?version={version}' if version else ''}" class="button">Process Another Document</a>
+            <!-- Debug info: version='{version}' -->
         </div>
     </body>
     </html>
