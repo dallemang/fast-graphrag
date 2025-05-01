@@ -1301,6 +1301,23 @@ def workshop_page():
             {filter_message}
             
             {('<ul>' + projects_html + '</ul>') if project_count > 0 else '<div class="no-results">No projects match your filter criteria.</div>'}
+            
+            <div class="credits-section" style="margin-top: 40px; border-top: 1px solid #eee; padding-top: 20px;">
+                <details style="background-color: #f9f9f9; padding: 15px; border-radius: 5px; cursor: pointer;">
+                    <summary style="font-weight: bold; color: #555; user-select: none;">Credits and Disclaimers</summary>
+                    <div style="padding: 15px; margin-top: 10px; line-height: 1.6;">
+                         <p>The software provided is a derivative of open-source software, Fast-GraphRAG, originally developed by CircleMind (https://github.com/circlemind-ai/fast-graphrag).</p>
+
+                         <p>This derivative is neither a product of, nor endorsed by Data.World, Dean Allemang, or Working Ontologist LLC. It is supplied solely for the purposes of entertainment and education.</p>
+
+                         <p>Neither Data.World, Dean Allemang, Working Ontologist LLC, nor any affiliated entities make any representations or warranties concerning this software's use within this workshop context or otherwise. This software is provided "as is".</p>
+
+                         <p>Upon the conclusion of the workshop, all associated services will cease, and any data generated will be promptly erased. Please understand this procedure is final, to ensure privacy and confidentiality.</p>                        
+                        
+                        <p><strong>Disclaimer:</strong> This application is a demo for educational purposes. The quality of entity classification and knowledge extraction depends on the source text quality and the language model's capabilities.</p>
+                    </div>
+                </details>
+            </div>
         </body>
         </html>
         """
