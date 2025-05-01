@@ -5,20 +5,30 @@ import shutil
 import requests
 import traceback
 import datetime
+import uuid
+import time
 from io import BytesIO
-from flask import Flask, request, jsonify, send_from_directory, send_file
+from flask import Flask, request, jsonify, send_from_directory, send_file, redirect, url_for
+from rq import Queue
+from redis import Redis
 from fast_graphrag import GraphRAG
 from fast_graphrag._utils import get_event_loop
 from rdflib import Graph, URIRef, Literal, Dataset, Namespace
 from rdflib.namespace import RDF, OWL, RDFS, SKOS, XSD
 from urllib.parse import urlparse
 from typing import Dict, Optional
+from worker import process_content, get_job_status, JOB_PREFIX
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
+
+# Set up Redis and RQ
+redis_url = os.getenv('REDIS_URL', 'redis://localhost:6379')
+redis_conn = Redis.from_url(redis_url)
+q = Queue('graphrag_processing', connection=redis_conn)
 
 # Global variables for ontology data
 prefixes: Dict[str, str] = {}
@@ -29,6 +39,9 @@ curie_map: Dict[str, URIRef] = {}  # Case-insensitive CURIE lookup
 
 # Track last successful upload for each version
 last_successful_uploads = {}
+
+# Cache last input text for each version to facilitate ontology testing workflow
+input_text_cache = {}
 
 # System namespace for GraphRAG
 SE = Namespace("https://models.data.world/graphrag/")  # type: ignore
@@ -448,6 +461,111 @@ async def build_rdf_graph(grag):
         return Graph()
 
 # Routes
+@app.route('/', methods=['GET'])
+def home():
+    """Main landing page"""
+    return """
+    <html>
+    <head>
+        <title>GraphRAG Processing Service</title>
+        <link rel="icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" type="image/png">
+        <style>
+            body { 
+                font-family: Arial, sans-serif; 
+                margin: 0;
+                padding: 0;
+                line-height: 1.6;
+                color: #333;
+            }
+            .container {
+                width: 80%;
+                margin: 0 auto;
+                padding: 20px;
+            }
+            header {
+                background-color: #333;
+                color: white;
+                padding: 1rem 0;
+                text-align: center;
+            }
+            h1 { 
+                margin: 0;
+                padding: 0;
+            }
+            .card {
+                background-color: #f9f9f9;
+                border-radius: 8px;
+                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                padding: 20px;
+                margin-bottom: 20px;
+            }
+            .card h2 {
+                border-bottom: 1px solid #ddd;
+                padding-bottom: 10px;
+                margin-top: 0;
+            }
+            .btn {
+                display: inline-block;
+                background-color: #4CAF50;
+                color: white;
+                padding: 10px 15px;
+                text-decoration: none;
+                border-radius: 4px;
+                font-weight: bold;
+                margin-top: 10px;
+            }
+            .btn:hover {
+                background-color: #45a049;
+            }
+            .info {
+                background-color: #e7f3fe;
+                border-left: 5px solid #2196F3;
+                padding: 15px;
+                margin: 20px 0;
+            }
+        </style>
+    </head>
+    <body>
+        <header>
+            <h1>GraphRAG Processing Service</h1>
+        </header>
+        
+        <div class="container">
+            <div class="info">
+                <p>This service processes text input and generates a knowledge graph using GraphRAG. 
+                Processing happens in the background for large inputs, and results can be uploaded to data.world.</p>
+            </div>
+            
+            <div class="card">
+                <h2>Process Text</h2>
+                <p>Upload text to create a knowledge graph. Specify a version to upload results to data.world.</p>
+                <a href="/upload" class="btn">Standard Upload</a>
+            </div>
+            
+            <div class="card">
+                <h2>Workshop Mode</h2>
+                <p>Browse and filter projects from a specific organization in data.world.</p>
+                <p>Examples:</p>
+                <ul>
+                    <li><a href="/workshop?org=aice">AICE Projects</a></li>
+                    <li><a href="/workshop?org=aice&filter=KGC">AICE Projects with "KGC" in the title</a></li>
+                </ul>
+            </div>
+            
+            <div class="card">
+                <h2>API Endpoints</h2>
+                <ul>
+                    <li><strong>/health</strong> - Check system health</li>
+                    <li><strong>/process</strong> - Process text (POST endpoint)</li>
+                    <li><strong>/query</strong> - Query a processed knowledge graph (POST endpoint)</li>
+                    <li><strong>/job/:id</strong> - Check job status</li>
+                </ul>
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+
 @app.route('/health', methods=['GET'])
 def health():
     return jsonify({"status": "ok"})
@@ -517,6 +635,10 @@ def upload_page():
         input_text = request.form.get('input_text', '')
         version = request.form.get('version', '')
         
+        # Cache the input text for this version (for later reuse)
+        if input_text and version:
+            input_text_cache[version] = input_text
+        
         if not input_text:
             return """
             <html>
@@ -543,357 +665,28 @@ def upload_page():
             </body>
             </html>
             """.format(version, version, version)
+        
+        # Generate a unique job ID for background processing
+        job_id = str(uuid.uuid4())
+        
+        # Queue the job for background processing
+        job = q.enqueue(
+            process_content, 
+            job_id=job_id,
+            kwargs={
+                'job_id': job_id,
+                'version': version,
+                'input_text': input_text,
+                'renew': True
+            },
+            timeout=1800  # 30 minutes timeout
+        )
+        
+        logger.info(f"Queued processing job with ID: {job_id}")
+        
+        # Redirect to the waiting page
+        return redirect(f'/job/{job_id}/wait')
             
-        # Process the data using the API endpoint logic
-        try:
-            # Create a resolver with context
-            resolver = make_curie_resolver(prefixes, curie_map)
-            
-            # If renew flag is set, clean up old files (always true for this endpoint)
-            renew = True
-            if renew:
-                logger.info("Cleaning up old graph files...")
-                working_dir = "./print3D_example"
-                if os.path.exists(working_dir):
-                    for file in os.listdir(working_dir):
-                        file_path = os.path.join(working_dir, file)
-                        try:
-                            if os.path.isfile(file_path):
-                                os.unlink(file_path)
-                            elif os.path.isdir(file_path):
-                                shutil.rmtree(file_path)
-                        except Exception as e:
-                            logger.error(f'Error deleting {file_path}: {e}')
-                            return f"""
-                            <html>
-                            <head>
-                                <title>Error</title>
-                                <style>
-                                    body {{ font-family: Arial, sans-serif; margin: 20px; }}
-                                    h1 {{ color: #333; }}
-                                    .error {{ color: red; }}
-                                </style>
-                            </head>
-                            <body>
-                                <h1>Error</h1>
-                                <div class="error">Failed to clean up files: {str(e)}</div>
-                                <a href="/upload?version={version}">Go Back</a>
-                            </body>
-                            </html>
-                            """
-                    logger.info("Cleanup complete")
-            
-            # Load ontology
-            try:
-                # Download data from the data.world API
-                if version:
-                    api_token = os.getenv('DW_AUTH_TOKEN')
-                    if not api_token:
-                        return f"""
-                        <html>
-                        <head>
-                            <title>Error</title>
-                            <style>
-                                body {{ font-family: Arial, sans-serif; margin: 20px; }}
-                                h1 {{ color: #333; }}
-                                .error {{ color: red; }}
-                            </style>
-                        </head>
-                        <body>
-                            <h1>Error</h1>
-                            <div class="error">DW_AUTH_TOKEN not found in environment variables</div>
-                            <a href="/upload?version={version}">Go Back</a>
-                        </body>
-                        </html>
-                        """
-                        
-                    headers = {"Authorization": f"Bearer {api_token}"}
-                    url = f"https://api.data.world/v0/file_download/{version}/ontology.ttl"
-                    logger.info(f"Downloading ontology from {url}")
-                    response = requests.get(url, headers=headers)
-                    if not response.ok:
-                        response.raise_for_status()
-                    ontology_data = response.text
-                    load_ontology(ontology_data)
-                else:
-                    # If no version specified, read from local ontology.ttl file
-                    try:
-                        with open('ontology.ttl', 'r') as file:
-                            ontology_data = file.read()
-                            load_ontology(ontology_data)
-                    except FileNotFoundError:
-                        return f"""
-                        <html>
-                        <head>
-                            <title>Error</title>
-                            <style>
-                                body {{ font-family: Arial, sans-serif; margin: 20px; }}
-                                h1 {{ color: #333; }}
-                                .error {{ color: red; }}
-                            </style>
-                        </head>
-                        <body>
-                            <h1>Error</h1>
-                            <div class="error">Local ontology.ttl file not found</div>
-                            <a href="/upload?version={version}">Go Back</a>
-                        </body>
-                        </html>
-                        """
-                        
-                logger.info("Loaded ontology")
-                logger.info(f"Found prefixes: {prefixes}")
-                logger.info(f"Found entity types: {entity_types}")
-            except (FileNotFoundError, ValueError) as e:
-                return f"""
-                <html>
-                <head>
-                    <title>Error</title>
-                    <style>
-                        body {{ font-family: Arial, sans-serif; margin: 20px; }}
-                        h1 {{ color: #333; }}
-                        .error {{ color: red; }}
-                    </style>
-                </head>
-                <body>
-                    <h1>Error</h1>
-                    <div class="error">Failed to load ontology: {str(e)}</div>
-                    <a href="/upload?version={version}">Go Back</a>
-                </body>
-                </html>
-                """
-            except requests.HTTPError as e:
-                return f"""
-                <html>
-                <head>
-                    <title>Error</title>
-                    <style>
-                        body {{ font-family: Arial, sans-serif; margin: 20px; }}
-                        h1 {{ color: #333; }}
-                        .error {{ color: red; }}
-                    </style>
-                </head>
-                <body>
-                    <h1>Error</h1>
-                    <div class="error">Failed to download ontology: {str(e)}</div>
-                    <a href="/upload?version={version}">Go Back</a>
-                </body>
-                </html>
-                """
-            
-            # Create GraphRAG instance
-            grag = GraphRAG(
-                working_dir="./print3D_example",
-                domain=domain,
-                example_queries="\n".join([
-                    "How does one printer compare to another?",
-                    "What are the different types of printers?",
-                    "What are the different types of materials?",
-                    "What are the different types of nozzles?",
-                    "What nozzle is best for a particular material?"
-                ]),
-                entity_types=entity_types,
-                config=GraphRAG.Config(
-                    resolve_curie=resolver
-                )
-            )
-            
-            logger.info(f"Using provided input text ({len(input_text)} characters)")
-            logger.info("Starting content insertion...")
-            grag.insert(input_text)
-            logger.info("Completed content insertion")
-            
-            # Build and save RDF graph
-            g = get_event_loop().run_until_complete(build_rdf_graph(grag))
-            
-            # Apply hygiene rules and save RDF graph
-            g = apply_hygiene_rules(g, ontology)
-            
-            # Extract version name for the filename (part after the slash)
-            if version and '/' in version:
-                version_part = version.split('/')[-1]
-                filename = f"{version_part}.ontology.ttl"
-            else:
-                filename = "unknown-version.ontology.ttl"
-                
-            # Save a local copy for inspection
-            output_dir = "./output"
-            os.makedirs(output_dir, exist_ok=True)
-            local_output_path = os.path.join(output_dir, filename)
-            g.serialize(destination=local_output_path, format='turtle')
-            logger.info(f"Saved local RDF output to {local_output_path}")
-            
-            # Serialize the graph to a BytesIO object in turtle format for upload
-            data_in_memory = BytesIO()
-            g.serialize(destination=data_in_memory, format='turtle')
-            data_in_memory.seek(0)  # Necessary to rewind the BytesIO object
-
-            # Upload to data.world if a version is specified
-            upload_status = "Not uploaded (no version specified)"
-            if version:
-                # Your DW_AUTH_TOKEN should be available throughout the execution
-                api_token = os.getenv('DW_AUTH_TOKEN')
-                if not api_token:
-                    return f"""
-                    <html>
-                    <head>
-                        <title>Error</title>
-                        <style>
-                            body {{ font-family: Arial, sans-serif; margin: 20px; }}
-                            h1 {{ color: #333; }}
-                            .error {{ color: red; }}
-                        </style>
-                    </head>
-                    <body>
-                        <h1>Error</h1>
-                        <div class="error">DW_AUTH_TOKEN not found for upload</div>
-                        <a href="/upload?version={version}">Go Back</a>
-                    </body>
-                    </html>
-                    """
-                    
-                filename = "ontology.ttl"
-                url = f"https://api.data.world/v0/uploads/{version}/files/{filename}"
-                
-                headers = {
-                    "accept": "application/json",
-                    "Authorization": f"Bearer {api_token}"
-                }
-                
-                logger.info(f"Uploading to data.world URL: {url}")
-                try:
-                    response = requests.put(
-                        url,
-                        headers=headers,
-                        data=data_in_memory
-                    )
-                    
-                    if response.status_code == 200:
-                        logger.info("Successfully uploaded RDF to data.world")
-                        upload_status = "Successfully uploaded to data.world"
-                        # Record successful upload time
-                        last_successful_uploads[version] = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                    else:
-                        error_message = response.text
-                        try:
-                            # Attempt to parse error as JSON
-                            error_json = response.json()
-                            if 'message' in error_json:
-                                error_message = error_json['message']
-                        except:
-                            # If not JSON, use text as is
-                            pass
-                            
-                        logger.error(f"Failed to upload to data.world: {error_message}")
-                        upload_status = f"Failed to upload (HTTP {response.status_code}): {error_message}"
-                except Exception as e:
-                    logger.error(f"Error during upload to data.world: {e}")
-                    upload_status = f"Error during upload: {str(e)}"
-            else:
-                logger.info("No version specified, skipping data.world upload")
-            
-            # Return result page - either success or failure
-            is_success = "Failed to upload" not in upload_status and "Error during upload" not in upload_status
-            status_class = "success" if is_success else "error"
-            status_color = "green" if is_success else "red"
-            status_icon = "✅" if is_success else "❌"
-            
-            # Get last successful submission time if available
-            last_success_info = ""
-            if version in last_successful_uploads and not is_success:
-                last_time = last_successful_uploads[version]
-                last_success_info = f'''
-                <div class="info-banner">
-                    <p><span class="success-icon">ℹ️</span> Last successful submission: {last_time}</p>
-                </div>
-                '''
-            
-            # Get just the filename part for the download link
-            filename = os.path.basename(local_output_path)
-            
-            return f"""
-            <html>
-            <head>
-                <title>Processing Complete</title>
-                <style>
-                    body {{ font-family: Arial, sans-serif; margin: 20px; }}
-                    h1 {{ color: #333; }}
-                    .success {{ color: green; font-weight: bold; }}
-                    .warning {{ color: orange; font-weight: bold; }}
-                    .error {{ color: red; font-weight: bold; }}
-                    pre {{ background-color: #f7f7f7; padding: 10px; border-radius: 5px; overflow-x: auto; }}
-                    .status {{ color: {status_color}; font-weight: bold; }}
-                    .status-banner {{
-                        background-color: {("#dff2bf" if status_color == "green" else "#ffbaba")};
-                        color: {status_color};
-                        padding: 15px;
-                        margin-bottom: 20px;
-                        border-radius: 5px;
-                        font-weight: bold;
-                    }}
-                    .info-banner {{
-                        background-color: #e7f3fe;
-                        color: #0c5460;
-                        padding: 10px;
-                        margin-bottom: 15px;
-                        border-radius: 5px;
-                    }}
-                    .success-icon {{ font-size: 1.2em; margin-right: 5px; }}
-                    .button {{
-                        display: inline-block;
-                        background-color: #4CAF50;
-                        color: white;
-                        padding: 10px 15px;
-                        margin: 10px 5px 10px 0;
-                        border: none;
-                        border-radius: 4px;
-                        cursor: pointer;
-                        text-decoration: none;
-                    }}
-                    .button:hover {{
-                        background-color: #45a049;
-                    }}
-                </style>
-            </head>
-            <body>
-                <h1>Processing Complete</h1>
-                
-                <div class="status-banner">
-                    <span class="success-icon">{status_icon}</span> {upload_status}
-                </div>
-                
-                {last_success_info}
-                
-                <p>Your text has been processed and saved as <strong>{filename}</strong>.</p>
-                
-                <div>
-                    <a href="/download/{filename}" class="button">Download Result</a>
-                    <a href="/upload?version={version}" class="button">Process Another Document</a>
-                </div>
-            </body>
-            </html>
-            """
-            
-        except Exception as e:
-            return f"""
-            <html>
-            <head>
-                <title>Error</title>
-                <style>
-                    body {{ font-family: Arial, sans-serif; margin: 20px; }}
-                    h1 {{ color: #333; }}
-                    .error {{ color: red; }}
-                    pre {{ background-color: #f7f7f7; padding: 10px; border-radius: 5px; overflow-x: auto; }}
-                </style>
-            </head>
-            <body>
-                <h1>Error</h1>
-                <div class="error">Failed to process content: {str(e)}</div>
-                <pre>{traceback.format_exc()}</pre>
-                <a href="/upload?version={version}">Go Back</a>
-            </body>
-            </html>
-            """
-    
     # Display the upload form (GET request)
     logger.info("Preparing to render upload form")
     last_upload_info = ""
@@ -957,6 +750,14 @@ def upload_page():
             @keyframes spin {{
                 to {{ transform: rotate(360deg); }}
             }}
+            .info-box {{
+                background-color: #e7f3fe;
+                color: #0c5460;
+                padding: 15px;
+                margin-bottom: 20px;
+                border-radius: 5px;
+                border-left: 5px solid #0c5460;
+            }}
         </style>
         <script>
             function showProcessing() {{
@@ -972,13 +773,29 @@ def upload_page():
     </head>
     <body>
         <h1>Upload page for version {version}</h1>
+        
+        <div class="info-box">
+            <p><strong>Background Processing:</strong> For large inputs, processing will happen in the background. 
+            You'll be taken to a progress page that updates automatically until processing is complete.</p>
+        </div>
+        
         {last_upload_info}
         <form method="post" onsubmit="return showProcessing()">
             <input type="hidden" name="version" value="{version}">
-            <input id="submitBtn" type="submit" value="Submit" style="padding: 10px 20px; font-size: 16px; background-color: #4CAF50; color: white; border: none; cursor: pointer;">
-            <span id="processingIndicator" style="display: none; margin-left: 10px; color: #666;">Processing...</span>
+            <div style="display: flex; margin-bottom: 10px;">
+                <input id="submitBtn" type="submit" value="Submit" style="padding: 10px 20px; font-size: 16px; background-color: #4CAF50; color: white; border: none; cursor: pointer;">
+                <span id="processingIndicator" style="display: none; margin-left: 10px; color: #666;">Processing...</span>
+                
+                {f'''
+                <a href="https://api.data.world/v0/file_download/{version}/ontology.ttl" 
+                   target="_blank" 
+                   style="margin-left: 20px; display: inline-block; padding: 10px 20px; font-size: 16px; background-color: #0066cc; color: white; border: none; cursor: pointer; text-decoration: none;">
+                   View Current Ontology
+                </a>
+                ''' if version else ''}
+            </div>
             <label for="input_text">Input text:</label>
-            <textarea name="input_text" id="input_text"></textarea>
+            <textarea name="input_text" id="input_text">{input_text_cache.get(version, '')}</textarea>
         </form>
     </body>
     </html>
@@ -995,162 +812,33 @@ def process():
     
     logger.info(f"Received request with version={version}, renew={renew}, input_text_provided={input_text is not None}")
     
-    # If renew flag is set, clean up old files
-    if renew:
-        logger.info("Cleaning up old graph files...")
-        working_dir = "./print3D_example"
-        if os.path.exists(working_dir):
-            for file in os.listdir(working_dir):
-                file_path = os.path.join(working_dir, file)
-                try:
-                    if os.path.isfile(file_path):
-                        os.unlink(file_path)
-                    elif os.path.isdir(file_path):
-                        shutil.rmtree(file_path)
-                except Exception as e:
-                    logger.error(f'Error deleting {file_path}: {e}')
-                    return jsonify({"error": f"Failed to clean up files: {str(e)}"}), 500
-            logger.info("Cleanup complete")
-
-    # Load ontology
-    try:
-        # Download data from the data.world API
-        if version:
-            api_token = os.getenv('DW_AUTH_TOKEN')
-            if not api_token:
-                return jsonify({"error": "DW_AUTH_TOKEN not found in environment variables"}), 500
-                
-            headers = {"Authorization": f"Bearer {api_token}"}
-            url = f"https://api.data.world/v0/file_download/{version}/ontology.ttl"
-            logger.info(f"Downloading ontology from {url}")
-            response = requests.get(url, headers=headers)
-            if not response.ok:
-                response.raise_for_status()
-            ontology_data = response.text
-            load_ontology(ontology_data)
-        else:
-            # If no version specified, read from local ontology.ttl file
-            try:
-                with open('ontology.ttl', 'r') as file:
-                    ontology_data = file.read()
-                    load_ontology(ontology_data)
-            except FileNotFoundError:
-                return jsonify({"error": "Local ontology.ttl file not found"}), 404
-                
-        logger.info("Loaded ontology")
-        logger.info(f"Found prefixes: {prefixes}")
-        logger.info(f"Found entity types: {entity_types}")
-    except (FileNotFoundError, ValueError) as e:
-        return jsonify({"error": f"Failed to load ontology: {str(e)}"}), 500
-    except requests.HTTPError as e:
-        return jsonify({"error": f"Failed to download ontology: {str(e)}"}), 500
-
-    # Create resolver with context
-    resolver = make_curie_resolver(prefixes, curie_map)
+    if not input_text:
+        return jsonify({"error": "Missing input_text field in request"}), 400
     
-    # Create GraphRAG instance
-    grag = GraphRAG(
-        working_dir="./print3D_example",
-        domain=domain,
-        example_queries="\n".join([
-            "How does one printer compare to another?",
-            "What are the different types of printers?",
-            "What are the different types of materials?",
-            "What are the different types of nozzles?",
-            "What nozzle is best for a particular material?"
-        ]),
-        entity_types=entity_types,
-        config=GraphRAG.Config(
-            resolve_curie=resolver  # Pass the resolver instead of the maps
-        )
+    # Generate a unique job ID
+    job_id = str(uuid.uuid4())
+    
+    # Queue the processing job
+    job = q.enqueue(
+        process_content, 
+        job_id=job_id,
+        kwargs={
+            'job_id': job_id,
+            'version': version,
+            'input_text': input_text,
+            'renew': renew
+        },
+        timeout=1800  # 30 minutes timeout
     )
-
-    # Process content and create graph
-    try:
-        if not input_text:
-            return jsonify({"error": "Missing input_text field in request"}), 400
-            
-        # Use the input text from the request
-        logger.info(f"Using provided input text ({len(input_text)} characters)")
-        content = input_text
-        
-        logger.info("Starting content insertion...")
-        grag.insert(content)
-        logger.info("Completed content insertion")
-    except Exception as e:
-        return jsonify({"error": f"Failed to process content: {str(e)}"}), 500
-
-    # Build and save RDF graph
-    try:
-        # Run the async function to build the graph
-        g = get_event_loop().run_until_complete(build_rdf_graph(grag))
-        
-        # Apply hygiene rules and save RDF graph
-        g = apply_hygiene_rules(g, ontology)
-        
-        # Extract version name for the filename (part after the slash)
-        if version and '/' in version:
-            version_part = version.split('/')[-1]
-            filename = f"{version_part}.ontology.ttl"
-        else:
-            filename = "unknown-version.ontology.ttl"
-            
-        # Save a local copy for inspection
-        output_dir = "./output"
-        os.makedirs(output_dir, exist_ok=True)
-        local_output_path = os.path.join(output_dir, filename)
-        g.serialize(destination=local_output_path, format='turtle')
-        logger.info(f"Saved local RDF output to {local_output_path}")
-        
-        # Serialize the graph to a BytesIO object in turtle format for upload
-        data_in_memory = BytesIO()
-        g.serialize(destination=data_in_memory, format='turtle')
-        data_in_memory.seek(0)  # Necessary to rewind the BytesIO object
-
-        # Upload to data.world if a version is specified
-        if version:
-            # Your DW_AUTH_TOKEN should be available throughout the execution
-            api_token = os.getenv('DW_AUTH_TOKEN')
-            if not api_token:
-                return jsonify({"error": "DW_AUTH_TOKEN not found for upload"}), 500
-                
-            filename = "ontology.ttl"
-            url = f"https://api.data.world/v0/uploads/{version}/files/{filename}"
-            
-            headers = {
-                "accept": "application/json",
-                "Authorization": f"Bearer {api_token}"
-            }
-            
-            logger.info(f"Uploading to data.world URL: {url}")
-            try:
-                response = requests.put(
-                    url,
-                    headers=headers,
-                    data=data_in_memory  # Use the BytesIO object as your data
-                )
-                
-                if response.status_code == 200: 
-                    logger.info("Successfully uploaded RDF to data.world")
-                else: 
-                    logger.error(f"Failed to upload to data.world: {response.text}")
-                    return jsonify({"error": f"Failed to upload to data.world: {response.text}"}), 500
-            except Exception as e:
-                logger.error(f"Error during upload to data.world: {e}")
-                return jsonify({"error": f"Error during upload: {str(e)}"}), 500
-        else:
-            logger.info("No version specified, skipping data.world upload")
-            
-        return jsonify({
-            "status": "success", 
-            "message": "Processing completed successfully",
-            "local_output": local_output_path,
-            "uploaded_to_dataworld": bool(version)
-        })
-        
-    except Exception as e:
-        logger.error(f"Error in graph processing: {e}", exc_info=True)
-        return jsonify({"error": f"Failed to build RDF graph: {str(e)}"}), 500
+    
+    logger.info(f"Queued processing job with ID: {job_id}")
+    
+    # Return immediately with job ID
+    return jsonify({
+        "status": "queued",
+        "job_id": job_id,
+        "message": "Processing job has been queued"
+    })
 
 @app.route('/query', methods=['POST'])
 def query():
@@ -1182,6 +870,216 @@ def query():
     except Exception as e:
         logger.error(f"Error processing query: {e}", exc_info=True)
         return jsonify({"error": str(e)}), 500
+
+@app.route('/job/<job_id>', methods=['GET'])
+def job_status(job_id):
+    """Check the status of a background job"""
+    status = get_job_status(job_id)
+    return jsonify(status)
+
+@app.route('/job/<job_id>/wait', methods=['GET'])
+def job_wait_page(job_id):
+    """Display a waiting page that refreshes until the job is complete"""
+    # Check job status
+    job_info = get_job_status(job_id)
+    status = job_info.get('status', 'unknown')
+    progress = job_info.get('progress', 0)
+    message = job_info.get('message', 'Processing...')
+    
+    # Determine if we should redirect to results
+    if status == 'completed':
+        filename = job_info.get('filename', '')
+        return redirect(f'/job/{job_id}/result')
+    
+    # Determine page refresh rate based on status
+    refresh_rate = 5  # Default 5 seconds
+    if status == 'error':
+        refresh_rate = 0  # No refresh on error
+    
+    # Build the waiting page with progress indicator
+    progress_html = f"""
+    <div class="progress-container">
+        <div class="progress-bar" style="width: {progress}%;">
+            <span class="progress-text">{progress}%</span>
+        </div>
+    </div>
+    """
+    
+    return f"""
+    <html>
+    <head>
+        <title>Processing - Job {job_id}</title>
+        <link rel="icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" type="image/png">
+        {f'<meta http-equiv="refresh" content="{refresh_rate}">' if refresh_rate > 0 else ''}
+        <script>
+            /* Extra protection against refresh loops */
+            var lastRefresh = localStorage.getItem('lastRefresh_{job_id}');
+            var now = new Date().getTime();
+            
+            if (lastRefresh && (now - lastRefresh < 5000)) {{
+                console.log('Preventing rapid refresh');
+                /* Stop any automatic refreshes if they're happening too quickly */
+                var meta = document.querySelector('meta[http-equiv="refresh"]');
+                if (meta) meta.remove();
+            }} else {{
+                localStorage.setItem('lastRefresh_{job_id}', now);
+            }}
+        </script>
+        <style>
+            body {{ font-family: Arial, sans-serif; margin: 20px; line-height: 1.6; }}
+            h1 {{ color: #333; }}
+            .job-info {{ 
+                background-color: #f5f5f5;
+                padding: 20px;
+                border-radius: 5px;
+                margin-bottom: 20px;
+            }}
+            .progress-container {{
+                width: 100%;
+                background-color: #f0f0f0;
+                border-radius: 4px;
+                margin: 20px 0;
+                height: 30px;
+                position: relative;
+            }}
+            .progress-bar {{
+                background-color: #4CAF50;
+                height: 100%;
+                border-radius: 4px;
+                transition: width 0.5s;
+                position: relative;
+            }}
+            .progress-text {{
+                position: absolute;
+                right: 10px;
+                color: white;
+                font-weight: bold;
+                line-height: 30px;
+            }}
+            .status {{
+                padding: 10px;
+                border-radius: 5px;
+                margin-top: 10px;
+                font-weight: bold;
+            }}
+            .status-processing {{ background-color: #e7f3fe; color: #0c5460; }}
+            .status-completed {{ background-color: #d4edda; color: #155724; }}
+            .status-error {{ background-color: #f8d7da; color: #721c24; }}
+            pre {{ background-color: #f8f9fa; padding: 15px; overflow-x: auto; }}
+        </style>
+    </head>
+    <body>
+        <h1>Processing Job</h1>
+        
+        <div class="job-info">
+            <p><strong>Job ID:</strong> {job_id}</p>
+            <p><strong>Status:</strong> {status}</p>
+            <p><strong>Message:</strong> {message}</p>
+            
+            <div class="status status-{status}">
+                {status.upper()}
+            </div>
+            
+            {progress_html if status != 'error' else ''}
+            
+            {f'<pre>{job_info.get("traceback", "")}</pre>' if status == 'error' and 'traceback' in job_info else ''}
+            
+            {f'<p><a href="/job/{job_id}/result">View Results</a></p>' if status == 'completed' else ''}
+            {f'<p>This page will automatically refresh every {refresh_rate} seconds until processing is complete.</p>' if refresh_rate > 0 else ''}
+        </div>
+    </body>
+    </html>
+    """
+
+@app.route('/job/<job_id>/result', methods=['GET'])
+def job_result_page(job_id):
+    """Display the results of a completed job"""
+    # Check job status
+    job_info = get_job_status(job_id)
+    status = job_info.get('status', 'unknown')
+    
+    if status != 'completed' and status != 'error':
+        return redirect(f'/job/{job_id}/wait')
+    
+    # Get result information
+    message = job_info.get('message', '')
+    filename = job_info.get('filename', '')
+    local_output = job_info.get('local_output', '')
+    uploaded = job_info.get('uploaded_to_dataworld', False)
+    version = job_info.get('version', '')
+    
+    status_class = "success" if status == 'completed' else "error"
+    status_color = "green" if status == 'completed' else "red"
+    status_icon = "✅" if status == 'completed' else "❌"
+    
+    return f"""
+    <html>
+    <head>
+        <title>Job Results - {job_id}</title>
+        <link rel="icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" type="image/png">
+        <style>
+            body {{ font-family: Arial, sans-serif; margin: 20px; }}
+            h1 {{ color: #333; }}
+            .success {{ color: green; font-weight: bold; }}
+            .warning {{ color: orange; font-weight: bold; }}
+            .error {{ color: red; font-weight: bold; }}
+            pre {{ background-color: #f7f7f7; padding: 10px; border-radius: 5px; overflow-x: auto; }}
+            .status {{ color: {status_color}; font-weight: bold; }}
+            .status-banner {{
+                background-color: {("#dff2bf" if status_color == "green" else "#ffbaba")};
+                color: {status_color};
+                padding: 15px;
+                margin-bottom: 20px;
+                border-radius: 5px;
+                font-weight: bold;
+            }}
+            .button {{
+                display: inline-block;
+                background-color: #4CAF50;
+                color: white;
+                padding: 10px 15px;
+                margin: 10px 5px 10px 0;
+                border: none;
+                border-radius: 4px;
+                cursor: pointer;
+                text-decoration: none;
+            }}
+            .button:hover {{
+                background-color: #45a049;
+            }}
+        </style>
+    </head>
+    <body>
+        <h1>Processing Results</h1>
+        
+        <div class="status-banner">
+            <span class="status-icon">{status_icon}</span> {message}
+        </div>
+        
+        {'<p>Your text has been processed and saved.</p>' if status == 'completed' else ''}
+        
+        {f'<pre>{job_info.get("traceback", "")}</pre>' if status == 'error' and 'traceback' in job_info else ''}
+        
+        {f'''
+        <div class="workflow-guide" style="background-color: #e7f3fe; padding: 15px; margin: 20px 0; border-radius: 5px; border-left: 5px solid #2196F3;">
+            <h3>Workshop Workflow Guide:</h3>
+            <ol>
+                <li>Review the results and entity classifications in the downloaded file</li>
+                <li><a href="https://data.world/{version}" target="_blank">Modify the ontology in data.world</a></li>
+                <li>Click "Process Another Document" below to rerun the same text with the updated ontology</li>
+                <li>Repeat until you're satisfied with the entity classifications</li>
+            </ol>
+            <p><strong>Note:</strong> Your input text has been saved and will be pre-filled automatically.</p>
+        </div>
+        ''' if status == 'completed' and version else ''}
+        
+        <div>
+            {f'<a href="/download/{filename}" class="button">Download Result</a>' if filename and local_output else ''}
+            {f'<a href="/upload?version={version}" class="button">Process Another Document</a>' if version else '<a href="/" class="button">Process Another Document</a>'}
+        </div>
+    </body>
+    </html>
+    """
 
 @app.route('/download/<filename>', methods=['GET'])
 def download_file(filename):
