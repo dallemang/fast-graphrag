@@ -148,33 +148,59 @@ def make_curie_resolver(prefixes: Dict[str, str], curie_map: Dict[str, URIRef]):
             return None
         
         # Try case-insensitive lookup first
-        if curie.lower() in curie_map:
-            uri = curie_map[curie.lower()]
-            logger.info(f"✅ Found in curie_map: '{curie.lower()}' → {uri}")
+        curie_lower = curie.lower()
+        if curie_lower in curie_map:
+            uri = curie_map[curie_lower]
+            logger.info(f"✅ Found exact match in curie_map: '{curie_lower}' → {uri}")
             return uri
-        else:
-            logger.warning(f"❌ Not found in curie_map: '{curie.lower()}'")
-            
-            # Try to find similar keys
-            similar_keys = [k for k in curie_map.keys() if curie.lower() in k or k in curie.lower()]
-            if similar_keys:
-                logger.info(f"Similar keys that might match: {similar_keys[:5]}")
         
-        # Fall back to direct resolution if not found
+        # Try additional case-insensitive matching strategies
         prefix, local = curie.split(':', 1)
+        prefix_lower = prefix.lower()
+        local_lower = local.lower()
         
-        available_prefixes = [p.lower() for p in prefixes]
-        logger.info(f"Available prefixes: {available_prefixes}")
-        
-        if prefix.lower() in available_prefixes:
-            original_prefix = next(p for p in prefixes if p.lower() == prefix.lower())
-            uri_prefix = prefixes[original_prefix]
-            uri = URIRef(uri_prefix + safe_uri_name(local))
-            logger.info(f"✅ Resolved via prefix: {prefix} → {uri}")
+        # Check if just the local part exists (without prefix)
+        if local_lower in curie_map:
+            uri = curie_map[local_lower]
+            logger.info(f"✅ Matched local part only: '{local_lower}' → {uri}")
             return uri
-        else:
-            logger.warning(f"❌ Prefix not found: {prefix}")
             
+        # Try to resolve using available prefixes
+        available_prefixes = [p.lower() for p in prefixes]
+        logger.info(f"Checking prefix '{prefix_lower}' against available prefixes: {available_prefixes}")
+        
+        if prefix_lower in available_prefixes:
+            # Find the original case of the prefix
+            original_prefix = next(p for p in prefixes if p.lower() == prefix_lower)
+            uri_prefix = prefixes[original_prefix]
+            
+            # First try to find the full expanded URI in the curie_map
+            full_uri_lower = (uri_prefix + safe_uri_name(local)).lower()
+            if full_uri_lower in curie_map:
+                uri = curie_map[full_uri_lower]
+                logger.info(f"✅ Matched expanded URI: '{full_uri_lower}' → {uri}")
+                return uri
+                
+            # If not found, construct a new URI
+            uri = URIRef(uri_prefix + safe_uri_name(local))
+            logger.info(f"✅ Constructed new URI from prefix: {prefix} → {uri}")
+            return uri
+        
+        # Last resort: try to find any similar keys
+        logger.warning(f"❌ Not found in curie_map: '{curie_lower}'")
+        similar_keys = [k for k in curie_map.keys() if 
+                        (curie_lower in k or k in curie_lower or
+                         local_lower in k or k in local_lower)]
+        if similar_keys:
+            logger.info(f"Similar keys that might match: {similar_keys[:5]}")
+            
+            # If we have very similar keys, use the first one as a last resort
+            if len(similar_keys) > 0 and (local_lower in similar_keys[0] or similar_keys[0] in local_lower):
+                uri = curie_map[similar_keys[0]]
+                logger.info(f"⚠️ Using closest match as fallback: '{similar_keys[0]}' → {uri}")
+                return uri
+        
+        logger.warning(f"❌ Failed to resolve CURIE: {curie}")
         return None
         
     return resolve_curie
