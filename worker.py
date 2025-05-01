@@ -26,24 +26,94 @@ from redis import Redis
 import json
 import os
 
-# Connect to Redis with SSL verification disabled for Heroku
+# Connect to Redis with a special approach for Heroku
+# Critical fix for "Connection reset by peer" errors
 redis_url = os.getenv('REDIS_URL', 'redis://localhost:6379')
+logger.info(f"Using REDIS_URL: {redis_url}")
+
+# Special handling for Heroku Redis
+is_heroku_redis = "compute-1.amazonaws.com" in redis_url
+if is_heroku_redis:
+    logger.info("Detected Heroku Redis URL - applying special handling")
+    # Extract credentials and host
+    import re
+    from urllib.parse import urlparse, parse_qs
+    
+    # Parse the URL to work with it
+    parsed_url = urlparse(redis_url)
+    
+    # Check if we already have query parameters
+    query_params = parse_qs(parsed_url.query)
+    
+    # Don't override existing parameters if they exist
+    connection_params = {
+        'socket_timeout': int(query_params.get('socket_timeout', [60])[0]),
+        'socket_connect_timeout': int(query_params.get('socket_connect_timeout', [30])[0]),
+        'socket_keepalive': query_params.get('socket_keepalive', ['true'])[0] == 'true',
+        'retry_on_timeout': True,
+        'health_check_interval': int(query_params.get('health_check_interval', [15])[0]),
+        'decode_responses': False,  # Important for binary data
+    }
+    
+    logger.info(f"Using special Heroku Redis connection parameters: {connection_params}")
+
+# First try: Full-featured connection with all necessary parameters
 try:
-    # First try with standard connection
-    redis_conn = Redis.from_url(redis_url)
-    redis_conn.ping()  # Test connection
-except Exception as e:
-    if 'CERTIFICATE_VERIFY_FAILED' in str(e):
-        logger.warning("SSL certificate verification failed, trying with SSL verification disabled")
-        # If certificate verification fails, disable SSL verification
-        import urllib3
-        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-        redis_url = redis_url.replace('rediss://', 'redis://')
-        redis_conn = Redis.from_url(redis_url, ssl_cert_reqs=None)
+    if is_heroku_redis:
+        redis_conn = Redis.from_url(redis_url, **connection_params)
     else:
-        # For other errors, log and continue with the original connection
-        logger.error(f"Redis connection error: {e}")
-        redis_conn = Redis.from_url(redis_url)
+        redis_conn = Redis.from_url(
+            redis_url,
+            socket_timeout=60,
+            socket_connect_timeout=30,
+            retry_on_timeout=True,
+            decode_responses=False,  # Important for binary data
+            health_check_interval=30  # Regular health checks to detect disconnections
+        )
+    # Test connection with longer timeout for Heroku
+    redis_conn.ping()
+    logger.info("Successfully connected to Redis")
+except Exception as e:
+    logger.error(f"Redis connection failed: {e}")
+    
+    # Second try: Simplified connection with just essential parameters
+    try:
+        logger.info("Trying simplified connection with minimal options")
+        if is_heroku_redis:
+            # For Heroku, just use very basic parameters focused on preventing resets
+            redis_conn = Redis.from_url(
+                redis_url,
+                socket_timeout=90,  # Extra long timeout
+                retry_on_timeout=True
+            )
+        else:
+            redis_conn = Redis.from_url(redis_url)
+            
+        redis_conn.ping()
+        logger.info("Simplified Redis connection successful")
+    except Exception as e:
+        logger.error(f"Simplified Redis connection also failed: {e}")
+        
+        # Last resort: Use a mock Redis implementation that doesn't fail but doesn't do anything
+        logger.critical("ALL Redis connection attempts failed! Creating mock Redis for critical functionality")
+        
+        # Create a minimal mock Redis that won't fail but won't do much either
+        class MockRedis:
+            def __init__(self):
+                logger.warning("Using MockRedis - only minimal functionality will be available")
+            
+            def ping(self):
+                return True
+                
+            def set(self, key, value):
+                logger.info(f"MockRedis SET: {key}")
+                return True
+                
+            def get(self, key):
+                logger.info(f"MockRedis GET: {key}")
+                return None
+        
+        redis_conn = MockRedis()
 
 # Key prefix for job results
 JOB_PREFIX = 'graphrag:job:'
@@ -782,6 +852,19 @@ def process_content(job_id, version, input_text, title=None, renew=True):
 
 def get_job_status(job_id):
     """Get the status of a job by ID"""
+    # Handle the case where we're using MockRedis
+    if not isinstance(redis_conn, Redis):
+        logger.warning(f"Using MockRedis - returning fake job status for {job_id}")
+        # Return a mock status that won't crash the app but will show the Redis issue
+        return {
+            'status': 'error',
+            'message': 'Redis connection unavailable - Cannot process jobs',
+            'progress': 0,
+            'redis_error': 'Connection reset by peer - Redis connection failed',
+            'job_id': job_id
+        }
+    
+    # Normal Redis operation
     key = f"{JOB_PREFIX}{job_id}"
     job_data = redis_conn.get(key)
     
@@ -805,6 +888,7 @@ def get_job_status(job_id):
             elif job.is_failed:
                 return {'status': 'error', 'message': f'Job failed: {job.exc_info}', 'progress': 0}
         except Exception as e:
+            logger.error(f"Error checking job in RQ: {e}")
             # Not found in RQ either
             pass
             
