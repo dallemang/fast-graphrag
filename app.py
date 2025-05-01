@@ -26,9 +26,25 @@ logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
-# Set up Redis and RQ
+# Set up Redis and RQ with SSL verification disabled for Heroku
 redis_url = os.getenv('REDIS_URL', 'redis://localhost:6379')
-redis_conn = Redis.from_url(redis_url)
+try:
+    # First try with standard connection
+    redis_conn = Redis.from_url(redis_url)
+    redis_conn.ping()  # Test connection
+except Exception as e:
+    if 'CERTIFICATE_VERIFY_FAILED' in str(e):
+        logger.warning("SSL certificate verification failed, trying with SSL verification disabled")
+        # If certificate verification fails, disable SSL verification
+        import urllib3
+        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+        redis_url = redis_url.replace('rediss://', 'redis://')
+        redis_conn = Redis.from_url(redis_url, ssl_cert_reqs=None)
+    else:
+        # For other errors, log and continue with the original connection
+        logger.error(f"Redis connection error: {e}")
+        redis_conn = Redis.from_url(redis_url)
+
 q = Queue('graphrag_processing', connection=redis_conn)
 
 # Global variables for ontology data
