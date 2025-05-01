@@ -1304,7 +1304,7 @@ def workshop_page():
             
             <div class="credits-section" style="margin-top: 40px; border-top: 1px solid #eee; padding-top: 20px;">
                 <details style="background-color: #f9f9f9; padding: 15px; border-radius: 5px; cursor: pointer;">
-                    <summary style="font-weight: bold; color: #555; user-select: none;">Credits and Disclaimers</summary>
+                    <summary style="font-weight: bold; color: #555; user-select: none; font-size: 9px;">Credits and Disclaimers</summary>
                     <div style="padding: 15px; margin-top: 10px; line-height: 1.6;">
                          <p>The software provided is a derivative of open-source software, Fast-GraphRAG, originally developed by CircleMind (https://github.com/circlemind-ai/fast-graphrag).</p>
 
