@@ -1,31 +1,38 @@
 #!/bin/bash
-  # scale-down.sh - Run this immediately after the workshop
+# scaledown.sh - Run this immediately after the workshop
 
-  # App name
-  APP=kgc-ddw-entity
+# App name
+APP=kgc-ddw-entity
 
-  echo "Scaling down resources after workshop..."
+echo "Scaling down resources after workshop..."
 
-  # Downgrade dynos
-  echo "Downgrading dynos to hobby..."
-  heroku ps:type web=hobby -a $APP
-  heroku ps:type worker=hobby -a $APP
+# First, scale down worker count to avoid issues
+echo "Scaling down to 1 worker dyno..."
+heroku ps:scale worker=1 -a $APP
 
-  # Scale down workers
-  echo "Scaling down to 1 worker dyno..."
-  heroku ps:scale worker=1 -a $APP
+# Downgrade all dynos to Basic
+echo "Downgrading dynos to Basic tier..."
+heroku ps:type basic -a $APP
 
-  # Downgrade Redis
-  echo "Checking Redis..."
-  PREMIUM_REDIS=$(heroku addons -a $APP | grep "heroku-redis.*premium")
+# Downgrade Redis
+echo "Checking for premium Redis..."
+PREMIUM_REDIS=$(heroku addons -a $APP | grep -i "heroku-redis.*premium")
 
-  if [[ ! -z "$PREMIUM_REDIS" ]]; then
-    echo "Downgrading Redis to hobby-dev..."
-    heroku addons:downgrade heroku-redis:hobby-dev -a $APP
-  fi
+if [[ ! -z "$PREMIUM_REDIS" ]]; then
+  echo "Downgrading Redis to mini plan..."
+  heroku addons:downgrade heroku-redis:mini -a $APP
+fi
 
-  echo "Scale-down complete! Resources returned to normal levels."
-  echo "Current dyno formation:"
-  heroku ps -a $APP
-  echo "Current addons:"
-  heroku addons -a $APP
+# Restart the app to ensure changes take effect
+echo "Restarting app with new configuration..."
+heroku restart -a $APP
+
+echo "Scale-down complete! Resources returned to normal levels."
+echo "Current dyno formation:"
+heroku ps -a $APP
+echo "Current addons:"
+heroku addons -a $APP
+
+# Run resource check to confirm
+echo -e "\nRunning resource check to confirm no expensive resources remain..."
+./check-resources.sh

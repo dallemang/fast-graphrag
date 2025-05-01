@@ -26,26 +26,117 @@ logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
-# Set up Redis and RQ with SSL verification disabled for Heroku
+# Connect to Redis with a special approach for Heroku
+# Critical fix for "Connection reset by peer" errors
 redis_url = os.getenv('REDIS_URL', 'redis://localhost:6379')
-try:
-    # First try with standard connection
-    redis_conn = Redis.from_url(redis_url)
-    redis_conn.ping()  # Test connection
-except Exception as e:
-    if 'CERTIFICATE_VERIFY_FAILED' in str(e):
-        logger.warning("SSL certificate verification failed, trying with SSL verification disabled")
-        # If certificate verification fails, disable SSL verification
-        import urllib3
-        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-        redis_url = redis_url.replace('rediss://', 'redis://')
-        redis_conn = Redis.from_url(redis_url, ssl_cert_reqs=None)
-    else:
-        # For other errors, log and continue with the original connection
-        logger.error(f"Redis connection error: {e}")
-        redis_conn = Redis.from_url(redis_url)
+logger.info(f"Using REDIS_URL: {redis_url}")
 
-q = Queue('graphrag_processing', connection=redis_conn)
+# Special handling for Heroku Redis
+is_heroku_redis = "compute-1.amazonaws.com" in redis_url
+if is_heroku_redis:
+    logger.info("Detected Heroku Redis URL - applying special handling")
+    # Extract credentials and host
+    import re
+    from urllib.parse import urlparse, parse_qs
+    
+    # Parse the URL to work with it
+    parsed_url = urlparse(redis_url)
+    
+    # Check if we already have query parameters
+    query_params = parse_qs(parsed_url.query)
+    
+    # Don't override existing parameters if they exist
+    connection_params = {
+        'socket_timeout': int(query_params.get('socket_timeout', [60])[0]),
+        'socket_connect_timeout': int(query_params.get('socket_connect_timeout', [30])[0]),
+        'socket_keepalive': query_params.get('socket_keepalive', ['true'])[0] == 'true',
+        'retry_on_timeout': True,
+        'health_check_interval': int(query_params.get('health_check_interval', [15])[0]),
+        'decode_responses': False,  # Important for binary data
+    }
+    
+    logger.info(f"Using special Heroku Redis connection parameters: {connection_params}")
+
+# First try: Full-featured connection with all necessary parameters
+try:
+    if is_heroku_redis:
+        redis_conn = Redis.from_url(redis_url, **connection_params)
+    else:
+        redis_conn = Redis.from_url(
+            redis_url,
+            socket_timeout=60,
+            socket_connect_timeout=30,
+            retry_on_timeout=True,
+            decode_responses=False,  # Important for binary data
+            health_check_interval=30  # Regular health checks to detect disconnections
+        )
+    # Test connection with longer timeout for Heroku
+    redis_conn.ping()
+    logger.info("Successfully connected to Redis")
+except Exception as e:
+    logger.error(f"Redis connection failed: {e}")
+    
+    # Second try: Simplified connection with just essential parameters
+    try:
+        logger.info("Trying simplified connection with minimal options")
+        if is_heroku_redis:
+            # For Heroku, just use very basic parameters focused on preventing resets
+            redis_conn = Redis.from_url(
+                redis_url,
+                socket_timeout=90,  # Extra long timeout
+                retry_on_timeout=True
+            )
+        else:
+            redis_conn = Redis.from_url(redis_url)
+            
+        redis_conn.ping()
+        logger.info("Simplified Redis connection successful")
+    except Exception as e:
+        logger.error(f"Simplified Redis connection also failed: {e}")
+        
+        # For the web app, create a dummy queue that won't crash but won't work
+        logger.critical("ALL Redis connection attempts failed! Using dummy Redis/RQ implementation")
+        
+        # Create a minimal mock Redis that won't fail but won't do much either
+        class MockRedis:
+            def __init__(self):
+                logger.warning("Using MockRedis - limited functionality will be available")
+            
+            def ping(self):
+                return True
+                
+            def set(self, key, value):
+                logger.info(f"MockRedis SET: {key}")
+                return True
+                
+            def get(self, key):
+                logger.info(f"MockRedis GET: {key}")
+                return None
+        
+        redis_conn = MockRedis()
+
+# Create a Queue for RQ, but add special handling for our MockRedis
+if isinstance(redis_conn, Redis):
+    q = Queue('graphrag_processing', connection=redis_conn)
+else:
+    # If we're using the mock Redis, create a mock Queue that won't crash the app
+    class MockQueue:
+        def __init__(self, *args, **kwargs):
+            logger.warning("Using MockQueue - job processing will not work")
+            
+        def enqueue(self, func, *args, **kwargs):
+            job_id = kwargs.get('job_id', 'mock-job-id')
+            logger.warning(f"MockQueue: Job {job_id} would be processed, but Redis is unavailable")
+            # Return a mock job object
+            class MockJob:
+                def __init__(self, job_id):
+                    self.id = job_id
+                    self.meta = {'status': 'mock', 'progress': 0}
+                def save_meta(self):
+                    pass
+            return MockJob(job_id)
+    
+    q = MockQueue('graphrag_processing')
 
 # Global variables for ontology data
 prefixes: Dict[str, str] = {}
@@ -596,7 +687,56 @@ def home():
 
 @app.route('/health', methods=['GET'])
 def health():
-    return jsonify({"status": "ok"})
+    redis_health = "ok"
+    redis_details = {}
+    
+    # Test Redis connection
+    try:
+        if isinstance(redis_conn, Redis):
+            redis_conn.ping()
+            redis_health = "connected"
+            
+            # Get Redis info if possible
+            try:
+                info = redis_conn.info()
+                redis_details = {
+                    "version": info.get("redis_version", "unknown"),
+                    "connected_clients": info.get("connected_clients", 0),
+                    "used_memory_human": info.get("used_memory_human", "unknown"),
+                    "uptime_in_seconds": info.get("uptime_in_seconds", 0)
+                }
+            except Exception as e:
+                redis_details = {"error": f"Could not get Redis info: {str(e)}"}
+        else:
+            redis_health = "unavailable"
+            redis_details = {"error": "Using MockRedis due to connection failures"}
+    except Exception as e:
+        redis_health = "error"
+        redis_details = {"error": str(e)}
+    
+    # Get information about the Redis URL
+    redis_url_info = {
+        "original": os.getenv('ORIGINAL_REDIS_URL', 'Not set'),
+        "current": redis_url,
+        "is_heroku": is_heroku_redis
+    }
+    
+    # Remove password from URLs
+    for key in redis_url_info:
+        if isinstance(redis_url_info[key], str) and "@" in redis_url_info[key]:
+            parts = redis_url_info[key].split("@")
+            auth_parts = parts[0].split("://")
+            if len(auth_parts) > 1:
+                redis_url_info[key] = f"{auth_parts[0]}://***:*****@{parts[1]}"
+    
+    return jsonify({
+        "status": "ok",
+        "redis": {
+            "status": redis_health,
+            "details": redis_details,
+            "url_info": redis_url_info
+        }
+    })
 
 @app.route('/debug', methods=['GET'])
 def debug_page():

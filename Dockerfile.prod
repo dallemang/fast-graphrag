@@ -46,9 +46,15 @@ ENV REDIS_URL=redis://localhost:6379
 # Expose the port
 EXPOSE 5000
 
-# Use a shell script to handle environment variable substitution properly
-RUN echo '#!/bin/bash\n\n# Determine whether to run web or worker based on DYNO env var\nif [[ "$DYNO" == *"web"* ]]; then\n  echo "Starting web process..."\n  exec gunicorn --bind 0.0.0.0:$PORT --timeout 30 --threads=4 --workers=1 --keep-alive=5 --access-logfile=- app:app\nelse\n  echo "Starting worker process..."\n  exec rq worker --url $REDIS_URL graphrag_processing\nfi' > /app/docker-entrypoint.sh && \
-    chmod +x /app/docker-entrypoint.sh
+# Install redis-cli for connection testing
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends redis-tools && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# Copy our enhanced entrypoint script
+COPY scripts/entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
 
 # Command to run - using exec form with entrypoint script
-CMD ["/app/docker-entrypoint.sh"]
+CMD ["/app/entrypoint.sh"]
