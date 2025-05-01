@@ -468,6 +468,11 @@ def favicon():
     return send_from_directory(os.path.join(app.root_path, 'static'),
                                'favicon.png', mimetype='image/png')
 
+@app.route('/static/<path:path>')
+def serve_static(path):
+    """Serve static files"""
+    return send_from_directory('static', path)
+
 @app.route('/', methods=['GET'])
 def home():
     """Main landing page"""
@@ -942,6 +947,9 @@ def job_wait_page(job_id):
     
     # Build the waiting page with progress indicator
     progress_html = f"""
+    <div style="text-align: center; margin: 20px 0;">
+        <img src="/static/process.gif" alt="Processing..." style="max-width: 100%; height: auto; margin-bottom: 15px;">
+    </div>
     <div class="progress-container">
         <div class="progress-bar" style="width: {progress}%;">
             <span class="progress-text">{progress}%</span>
@@ -981,17 +989,24 @@ def job_wait_page(job_id):
             .progress-container {{
                 width: 100%;
                 background-color: #f0f0f0;
-                border-radius: 4px;
+                border-radius: 8px;
                 margin: 20px 0;
                 height: 30px;
                 position: relative;
+                box-shadow: 0 2px 5px rgba(0,0,0,0.1);
             }}
             .progress-bar {{
-                background-color: #4CAF50;
+                background: linear-gradient(45deg, #4CAF50, #2196F3);
                 height: 100%;
-                border-radius: 4px;
-                transition: width 0.5s;
+                border-radius: 8px;
+                transition: width 0.8s ease;
                 position: relative;
+                animation: pulse 2s infinite;
+            }}
+            @keyframes pulse {{
+                0% {{ opacity: 0.8; }}
+                50% {{ opacity: 1; }}
+                100% {{ opacity: 0.8; }}
             }}
             .progress-text {{
                 position: absolute;
@@ -999,6 +1014,7 @@ def job_wait_page(job_id):
                 color: white;
                 font-weight: bold;
                 line-height: 30px;
+                text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
             }}
             .status {{
                 padding: 10px;
