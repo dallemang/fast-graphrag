@@ -7,6 +7,7 @@ import traceback
 import datetime
 import uuid
 import time
+import json
 from io import BytesIO
 from flask import Flask, request, jsonify, send_from_directory, send_file, redirect, url_for
 from rq import Queue
@@ -628,12 +629,21 @@ def upload_page():
     logger.info(f"Received {'POST' if request.method == 'POST' else 'GET'} request to /upload")
     
     version = request.args.get('version', '')
-    logger.info(f"Version from args: {version}")
+    title = request.args.get('title', '')
+    # URL decode the title if it's present
+    if title:
+        title = requests.utils.unquote(title)
+    
+    # If no title is provided but we have a version, use the version as a fallback
+    display_title = title if title else version
+    
+    logger.info(f"Version from args: {version}, Title: {title}")
     
     if request.method == 'POST':
         # Handle form submission
         input_text = request.form.get('input_text', '')
         version = request.form.get('version', '')
+        submit_title = request.form.get('title', title)  # Use the title from form or URL params
         
         # Cache the input text for this version (for later reuse)
         if input_text and version:
@@ -677,15 +687,17 @@ def upload_page():
                 'job_id': job_id,
                 'version': version,
                 'input_text': input_text,
+                'title': submit_title,
                 'renew': True
             },
             timeout=1800  # 30 minutes timeout
         )
         
-        logger.info(f"Queued processing job with ID: {job_id} for version: {version}")
+        logger.info(f"Queued processing job with ID: {job_id} for version: {version}, title: {submit_title}")
         
-        # Redirect to the waiting page, passing the version as a query parameter
-        return redirect(f'/job/{job_id}/wait?version={version}')
+        # Redirect to the waiting page, passing the version and title as query parameters
+        encoded_title = requests.utils.quote(submit_title) if submit_title else ""
+        return redirect(f'/job/{job_id}/wait?version={version}&title={encoded_title}')
             
     # Display the upload form (GET request)
     logger.info("Preparing to render upload form")
@@ -704,7 +716,7 @@ def upload_page():
     return f"""
     <html>
     <head>
-        <title>Upload page for version {version}</title>
+        <title>{display_title}</title>
         <link rel="icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" type="image/png">
         <style>
             body {{ font-family: Arial, sans-serif; margin: 20px; }}
@@ -772,7 +784,7 @@ def upload_page():
         </script>
     </head>
     <body>
-        <h1>Upload page for version {version}</h1>
+        <h1>{display_title}</h1>
         
         <div class="info-box">
             <p><strong>Background Processing:</strong> For large inputs, processing will happen in the background. 
@@ -782,17 +794,10 @@ def upload_page():
         {last_upload_info}
         <form method="post" onsubmit="return showProcessing()">
             <input type="hidden" name="version" value="{version}">
+            <input type="hidden" name="title" value="{title}">
             <div style="display: flex; margin-bottom: 10px;">
                 <input id="submitBtn" type="submit" value="Submit" style="padding: 10px 20px; font-size: 16px; background-color: #4CAF50; color: white; border: none; cursor: pointer;">
                 <span id="processingIndicator" style="display: none; margin-left: 10px; color: #666;">Processing...</span>
-                
-                {f'''
-                <a href="https://api.data.world/v0/file_download/{version}/ontology.ttl" 
-                   target="_blank" 
-                   style="margin-left: 20px; display: inline-block; padding: 10px 20px; font-size: 16px; background-color: #0066cc; color: white; border: none; cursor: pointer; text-decoration: none;">
-                   View Current Ontology
-                </a>
-                ''' if version else ''}
             </div>
             <label for="input_text">Input text:</label>
             <textarea name="input_text" id="input_text">{input_text_cache.get(version, '')}</textarea>
@@ -809,8 +814,9 @@ def process():
     version = request.json.get('version')
     renew = request.json.get('renew', False)
     input_text = request.json.get('input_text', None)
+    title = request.json.get('title', '')
     
-    logger.info(f"Received request with version={version}, renew={renew}, input_text_provided={input_text is not None}")
+    logger.info(f"Received request with version={version}, title={title}, renew={renew}, input_text_provided={input_text is not None}")
     
     if not input_text:
         return jsonify({"error": "Missing input_text field in request"}), 400
@@ -826,6 +832,7 @@ def process():
             'job_id': job_id,
             'version': version,
             'input_text': input_text,
+            'title': title,
             'renew': renew
         },
         timeout=1800  # 30 minutes timeout
@@ -880,22 +887,52 @@ def job_status(job_id):
 @app.route('/job/<job_id>/wait', methods=['GET'])
 def job_wait_page(job_id):
     """Display a waiting page that refreshes until the job is complete"""
-    # Check job status
-    job_info = get_job_status(job_id)
-    status = job_info.get('status', 'unknown')
-    progress = job_info.get('progress', 0)
-    message = job_info.get('message', 'Processing...')
-    
-    # Determine if we should redirect to results
-    if status == 'completed':
-        filename = job_info.get('filename', '')
+    try:
+        # Check job status
+        job_info = get_job_status(job_id)
+        status = job_info.get('status', 'unknown')
+        progress = job_info.get('progress', 0)
+        message = job_info.get('message', 'Processing...')
+        
+        # Get version and title from parameters
         version = request.args.get('version', '')
-        return redirect(f'/job/{job_id}/result?version={version}')
+        title = request.args.get('title', '')
+        
+        # Log for debugging
+        logger.info(f"Job wait page for job_id={job_id}, version='{version}', title='{title}', status={status}")
+        
+        # Determine if we should redirect to results
+        if status == 'completed':
+            filename = job_info.get('filename', '')
+            title_param = f"&title={requests.utils.quote(title)}" if title else ""
+            return redirect(f'/job/{job_id}/result?version={version}{title_param}')
+    except Exception as e:
+        # Log the exception but continue to render the page with error info
+        logger.error(f"Error in job_wait_page: {e}", exc_info=True)
+        job_info = {
+            'status': 'error',
+            'message': f'Error displaying job status: {str(e)}',
+            'traceback': traceback.format_exc(),
+            'progress': 0
+        }
+        status = 'error'
+        progress = 0
+        message = f'Error: {str(e)}'
+        version = request.args.get('version', '')
+        title = request.args.get('title', '')
     
     # Determine page refresh rate based on status
     refresh_rate = 5  # Default 5 seconds
+    
+    # Adjust refresh rate based on status
     if status == 'error':
         refresh_rate = 0  # No refresh on error
+    elif status == 'not_found':
+        refresh_rate = 10  # Longer refresh if job not found yet
+    elif 0 <= progress < 20:
+        refresh_rate = 3  # Faster refresh during early stages
+    elif progress >= 80:
+        refresh_rate = 2  # Faster refresh when close to completion
     
     # Build the waiting page with progress indicator
     progress_html = f"""
@@ -974,7 +1011,10 @@ def job_wait_page(job_id):
         
         <div class="job-info">
             <p><strong>Job ID:</strong> {job_id}</p>
+            <p><strong>Version:</strong> {version}</p>
+            <p><strong>Title:</strong> {title}</p>
             <p><strong>Status:</strong> {status}</p>
+            <p><strong>Progress:</strong> {progress}%</p>
             <p><strong>Message:</strong> {message}</p>
             
             <div class="status status-{status}">
@@ -985,8 +1025,15 @@ def job_wait_page(job_id):
             
             {f'<pre>{job_info.get("traceback", "")}</pre>' if status == 'error' and 'traceback' in job_info else ''}
             
-            {f'<p><a href="/job/{job_id}/result?version={request.args.get("version", "")}">View Results</a></p>' if status == 'completed' else ''}
+            {f'<p><a href="/job/{job_id}/result?version={version}&title={requests.utils.quote(title) if title else ""}" class="button">View Results</a></p>' if status == 'completed' else ''}
             {f'<p>This page will automatically refresh every {refresh_rate} seconds until processing is complete.</p>' if refresh_rate > 0 else ''}
+            
+            <div class="debug-info" style="margin-top: 20px; font-size: 12px; color: #666; border-top: 1px solid #ddd; padding-top: 10px;">
+                <details>
+                    <summary>Debug Information</summary>
+                    <pre>{json.dumps(job_info, indent=2, default=str)}</pre>
+                </details>
+            </div>
         </div>
     </body>
     </html>
@@ -995,16 +1042,39 @@ def job_wait_page(job_id):
 @app.route('/job/<job_id>/result', methods=['GET'])
 def job_result_page(job_id):
     """Display the results of a completed job"""
-    # Check job status
-    job_info = get_job_status(job_id)
-    status = job_info.get('status', 'unknown')
-    
-    # If we have a job but no version info, try to get it from the request
-    if 'version' not in job_info or not job_info.get('version'):
+    try:
+        # Check job status
+        job_info = get_job_status(job_id)
+        status = job_info.get('status', 'unknown')
+        
+        # Get version and title parameters
         version_param = request.args.get('version', '')
-        if version_param:
-            job_info['version'] = version_param
-            logger.info(f"Added version '{version_param}' from request to job info")
+        title_param = request.args.get('title', '')
+        
+        # Log debug info
+        logger.info(f"Job result page for job_id={job_id}, version='{version_param}', title='{title_param}', status={status}")
+        
+        # If we have a job but no version/title info, try to get it from the request
+        if 'version' not in job_info or not job_info.get('version'):
+            if version_param:
+                job_info['version'] = version_param
+                logger.info(f"Added version '{version_param}' from request to job info")
+                
+        # Also get the title from the request if available
+        if title_param:
+            job_info['title'] = title_param
+            logger.info(f"Added title '{title_param}' from request to job info")
+    except Exception as e:
+        # Log the exception but continue to render the page with error info
+        logger.error(f"Error in job_result_page: {e}", exc_info=True)
+        job_info = {
+            'status': 'error',
+            'message': f'Error displaying job results: {str(e)}',
+            'traceback': traceback.format_exc()
+        }
+        status = 'error'
+        version_param = request.args.get('version', '')
+        title_param = request.args.get('title', '')
     
     if status != 'completed' and status != 'error':
         return redirect(f'/job/{job_id}/wait')
@@ -1149,7 +1219,9 @@ def workshop_page():
                 continue
                 
             project_count += 1
-            upload_url = f"https://kgc-ddw-entity-db8350081a81.herokuapp.com/upload?version={org}/{project_id}"
+            # URL encode the title to safely include it in the URL
+            encoded_title = requests.utils.quote(project_title)
+            upload_url = f"https://kgc-ddw-entity-db8350081a81.herokuapp.com/upload?version={org}/{project_id}&title={encoded_title}"
             projects_html += f'<li><a href="{upload_url}" target="_blank">{project_title}</a></li>\n'
         
         # Filter status message
