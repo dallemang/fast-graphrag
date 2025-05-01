@@ -462,6 +462,12 @@ async def build_rdf_graph(grag):
         return Graph()
 
 # Routes
+@app.route('/favicon.png')
+def favicon():
+    """Serve the favicon"""
+    return send_from_directory(os.path.join(app.root_path, 'static'),
+                               'favicon.png', mimetype='image/png')
+
 @app.route('/', methods=['GET'])
 def home():
     """Main landing page"""
@@ -469,7 +475,7 @@ def home():
     <html>
     <head>
         <title>GraphRAG Processing Service</title>
-        <link rel="icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" type="image/png">
+        <link rel="icon" href="/favicon.png" type="image/png">
         <style>
             body { 
                 font-family: Arial, sans-serif; 
@@ -578,7 +584,7 @@ def debug_page():
     <html>
     <head>
         <title>Debug Page</title>
-        <link rel="icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" type="image/png">
+        <link rel="icon" href="/favicon.png" type="image/png">
         <style>
             body { font-family: Arial, sans-serif; padding: 20px; }
             button { padding: 10px; margin: 10px 0; }
@@ -717,7 +723,7 @@ def upload_page():
     <html>
     <head>
         <title>{display_title}</title>
-        <link rel="icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" type="image/png">
+        <link rel="icon" href="/favicon.png" type="image/png">
         <style>
             body {{ font-family: Arial, sans-serif; margin: 20px; }}
             h1 {{ color: #333; }}
@@ -947,7 +953,7 @@ def job_wait_page(job_id):
     <html>
     <head>
         <title>Processing - Job {job_id}</title>
-        <link rel="icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" type="image/png">
+        <link rel="icon" href="/favicon.png" type="image/png">
         {f'<meta http-equiv="refresh" content="{refresh_rate}">' if refresh_rate > 0 else ''}
         <script>
             /* Extra protection against refresh loops */
@@ -1096,7 +1102,7 @@ def job_result_page(job_id):
     <html>
     <head>
         <title>Job Results - {job_id}</title>
-        <link rel="icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" type="image/png">
+        <link rel="icon" href="/favicon.png" type="image/png">
         <style>
             body {{ font-family: Arial, sans-serif; margin: 20px; }}
             h1 {{ color: #333; }}
@@ -1250,7 +1256,7 @@ def workshop_page():
         <html>
         <head>
             <title>Workshop Projects for {org}</title>
-            <link rel="icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" type="image/png">
+            <link rel="icon" href="/favicon.png" type="image/png">
             <style>
                 body {{ font-family: Arial, sans-serif; margin: 20px; line-height: 1.6; }}
                 h1 {{ color: #333; }}
