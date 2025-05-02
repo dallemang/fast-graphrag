@@ -1,0 +1,21 @@
+setup:
+  addons:
+    - plan: heroku-redis
+      as: REDIS
+
+build:
+  docker:
+    web: Dockerfile
+    worker: Dockerfile
+
+run:
+  web: 
+    command: /app/entrypoint.sh
+    image: web
+    env:
+      DYNO_TYPE: web
+  worker:
+    command: /app/entrypoint.sh
+    image: worker
+    env:
+      DYNO_TYPE: worker
