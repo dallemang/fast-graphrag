@@ -1,0 +1,51 @@
+# Git
+.git
+.gitignore
+.github
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual Environment
+venv/
+ENV/
+fastrag/
+
+# Testing
+.coverage
+htmlcov/
+.pytest_cache/
+.ruff_cache/
+
+# Documentation
+docs/
+
+# Editor configs
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Project specific
+benchmarks/
+examples/
+tests/
+print3D_example/
