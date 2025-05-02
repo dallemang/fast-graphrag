@@ -5,7 +5,7 @@ import uuid
 import datetime
 import traceback
 from io import BytesIO
-from flask import Flask, request, jsonify, send_from_directory, render_template_string, redirect, url_for
+from flask import Flask, request, jsonify, send_from_directory, render_template_string, redirect, url_for, send_file
 from redis import Redis
 from rq import Queue
 from rq.job import Job
@@ -16,7 +16,29 @@ import ssl
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder='static')
+
+# Helper function to create HTML templates with favicon
+def service_unavailable_template(message="Redis connection is not available"):
+    """Generate a service unavailable template with favicon"""
+    return f"""
+    <html>
+    <head>
+        <title>Service Unavailable</title>
+        <link rel="icon" href="/static/favicon.png" type="image/png">
+        <style>
+            body {{ font-family: Arial, sans-serif; margin: 20px; }}
+            h1 {{ color: #333; }}
+            .error {{ color: red; font-weight: bold; }}
+        </style>
+    </head>
+    <body>
+        <h1>Service Unavailable</h1>
+        <div class="error">Error: {message}</div>
+        <p>The background processing service is not working. Please try again later or contact support.</p>
+    </body>
+    </html>
+    """
 
 # Redis connection setup
 def get_redis_connection():
@@ -231,6 +253,11 @@ def get_job_progress(job_id):
         return None
 
 # Routes
+@app.route('/static/<path:filename>')
+def serve_static(filename):
+    """Serve static files"""
+    return send_from_directory(app.static_folder, filename)
+
 @app.route('/health', methods=['GET'])
 def health():
     if redis_conn is None:
@@ -343,7 +370,7 @@ def debug_page():
     <html>
     <head>
         <title>Debug Page</title>
-        <link rel="icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" type="image/png">
+        <link rel="icon" href="/static/favicon.png" type="image/png">
         <style>
             body { font-family: Arial, sans-serif; padding: 20px; }
             button { padding: 10px; margin: 10px 0; }
@@ -376,23 +403,7 @@ def debug_page():
 def upload_page():
     # Check Redis connection
     if redis_conn is None:
-        return """
-        <html>
-        <head>
-            <title>Service Unavailable</title>
-            <style>
-                body { font-family: Arial, sans-serif; margin: 20px; }
-                h1 { color: #333; }
-                .error { color: red; font-weight: bold; }
-            </style>
-        </head>
-        <body>
-            <h1>Service Unavailable</h1>
-            <div class="error">Error: Redis connection is not available</div>
-            <p>The background processing service is not working. Please try again later or contact support.</p>
-        </body>
-        </html>
-        """
+        return service_unavailable_template()
     
     # For debugging
     logger.info(f"Received {'POST' if request.method == 'POST' else 'GET'} request to /upload")
@@ -528,7 +539,7 @@ def upload_page():
     <html>
     <head>
         <title>Upload page for version {version}</title>
-        <link rel="icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" type="image/png">
+        <link rel="icon" href="/static/favicon.png" type="image/png">
         <style>
             body {{ font-family: Arial, sans-serif; margin: 20px; }}
             h1 {{ color: #333; }}
@@ -607,23 +618,7 @@ def job_status(job_id):
     
     if redis_conn is None:
         logger.error("Redis connection is None when checking job status")
-        return """
-        <html>
-        <head>
-            <title>Service Unavailable</title>
-            <style>
-                body { font-family: Arial, sans-serif; margin: 20px; }
-                h1 { color: #333; }
-                .error { color: red; font-weight: bold; }
-            </style>
-        </head>
-        <body>
-            <h1>Service Unavailable</h1>
-            <div class="error">Error: Redis connection is not available</div>
-            <p>The background processing service is not working. Please try again later or contact support.</p>
-        </body>
-        </html>
-        """
+        return service_unavailable_template("Redis connection is not available for job status checking")
     
     # Debug: Log if metadata exists for this job
     metadata = get_job_metadata(job_id)
@@ -660,6 +655,7 @@ def job_status(job_id):
                 <html>
                 <head>
                     <title>Processing Complete</title>
+                    <link rel="icon" href="/static/favicon.png" type="image/png">
                     <style>
                         body {{ font-family: Arial, sans-serif; margin: 20px; }}
                         h1 {{ color: #333; }}
@@ -715,6 +711,7 @@ def job_status(job_id):
                 <html>
                 <head>
                     <title>Error</title>
+                    <link rel="icon" href="/static/favicon.png" type="image/png">
                     <style>
                         body {{ font-family: Arial, sans-serif; margin: 20px; }}
                         h1 {{ color: #333; }}
@@ -762,6 +759,7 @@ def job_status(job_id):
             <html>
             <head>
                 <title>Job Failed</title>
+                <link rel="icon" href="/static/favicon.png" type="image/png">
                 <style>
                     body {{ font-family: Arial, sans-serif; margin: 20px; }}
                     h1 {{ color: #333; }}
@@ -822,6 +820,7 @@ def job_status(job_id):
             <html>
             <head>
                 <title>Job Status</title>
+                <link rel="icon" href="/static/favicon.png" type="image/png">
                 <meta http-equiv="refresh" content="5;URL='/job/{job_id}'" />
                 <style>
                     body {{ font-family: Arial, sans-serif; margin: 20px; }}
@@ -889,6 +888,9 @@ def job_status(job_id):
                 
                 <div class="progress-section">
                     <div class="progress-title">Current Progress:</div>
+                    <div style="text-align: center; margin-bottom: 15px;">
+                        <img src="/static/process.gif" alt="Processing animation" style="width: 100%; display: block;">
+                    </div>
                     <div class="progress-bar-container">
                         <div class="progress-bar"></div>
                     </div>
@@ -937,6 +939,7 @@ def job_status(job_id):
         <html>
         <head>
             <title>Error</title>
+            <link rel="icon" href="/static/favicon.png" type="image/png">
             <style>
                 body {{ font-family: Arial, sans-serif; margin: 20px; }}
                 h1, h2, h3 {{ color: #333; }}
@@ -1247,7 +1250,7 @@ def workshop_page():
         <html>
         <head>
             <title>Workshop Projects for {org}</title>
-            <link rel="icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=" type="image/png">
+            <link rel="icon" href="/static/favicon.png" type="image/png">
             <style>
                 body {{ font-family: Arial, sans-serif; margin: 20px; line-height: 1.6; }}
                 h1 {{ color: #333; }}

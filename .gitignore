@@ -124,3 +124,10 @@ dmypy.json
 cython_debug/
 book_example/
 book.txt
+
+
+# Venv
+fastrag
+
+# junk
+print3D
