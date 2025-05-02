@@ -510,7 +510,7 @@ def process_job(job_data):
     Process a job from the queue.
     
     Args:
-        job_data (dict): A dictionary containing job details:
+        job_data (dict or list): A dictionary containing job details or a list where the first item is the job data:
             - version: The data.world version to use
             - input_text: The text to process
             - job_id: A unique identifier for this job
@@ -520,12 +520,23 @@ def process_job(job_data):
     """
     # Log the received job data type for debugging
     logger.info(f"process_job called with argument type: {type(job_data)}")
+    
+    # Handle the case where job_data might be wrapped in a list
+    if isinstance(job_data, list) and len(job_data) > 0:
+        logger.info("Job data was passed as a list, extracting first element")
+        job_data = job_data[0]
+        
+    # Log the processed job data
+    logger.info(f"Processing job data: {type(job_data)}, keys: {job_data.keys() if isinstance(job_data, dict) else 'not a dict'}")
+    
     try:
         # Initialize job info
         version = job_data.get('version')
         input_text = job_data.get('input_text', '')
         renew = job_data.get('renew', True)
         job_id = job_data.get('job_id', 'unknown')
+        
+        logger.info(f"Job details: id={job_id}, version={version}, text_length={len(input_text)}")
         
         # Initialize progress reporter
         progress = ProgressReporter(job_id)
@@ -905,23 +916,37 @@ def main():
         # Start the worker
         logger.info("Starting worker process...")
         
-        # Create a worker without using the Connection context manager
-        worker = Worker(['graphrag_processing'], connection=redis_conn)
-        logger.info("Worker created and ready to process jobs")
+        # Ensure queue name is consistent with web app
+        queue_name = 'graphrag_processing'
+        logger.info(f"Initializing worker to monitor queue: {queue_name}")
+        
+        # Create a worker
+        worker = Worker([queue_name], connection=redis_conn)
+        logger.info(f"Worker created for queue '{queue_name}' and ready to process jobs")
         
         # Log RQ queue details
         logger.info(f"Registered worker queues: {worker.queues}")
         try:
-            queue = Queue('graphrag_processing', connection=redis_conn)
-            queue_jobs = queue.get_job_ids()
-            logger.info(f"Queue status: {queue.name}, jobs count: {len(queue_jobs)}")
-            logger.info(f"First 5 jobs in queue: {queue_jobs[:5] if queue_jobs else 'No jobs'}")
+            queue = Queue(queue_name, connection=redis_conn)
+            # Get all job IDs in the queue
+            queue_jobs = queue.job_ids
+            logger.info(f"Queue status: '{queue.name}', jobs count: {len(queue_jobs)}")
+            logger.info(f"Jobs in queue: {queue_jobs}")
+            
+            # Check scheduled and finished jobs
+            scheduled_jobs = queue.scheduled_job_registry.get_job_ids()
+            logger.info(f"Scheduled jobs: {scheduled_jobs}")
+            finished_jobs = queue.finished_job_registry.get_job_ids()
+            logger.info(f"Finished jobs: {finished_jobs}")
+            failed_jobs = queue.failed_job_registry.get_job_ids()
+            logger.info(f"Failed jobs: {failed_jobs}")
         except Exception as e:
             logger.error(f"Failed to get queue information: {e}")
         
         # Start working (processing jobs)
+        # Note: Using only parameters known to be supported in the installed RQ version
         logger.info("Worker starting to process jobs")
-        worker.work()
+        worker.work(with_scheduler=True)
     except Exception as e:
         logger.error(f"Error in worker main function: {e}", exc_info=True)
         sys.exit(1)
