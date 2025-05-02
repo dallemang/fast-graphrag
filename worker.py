@@ -841,12 +841,14 @@ def process_job(job_data):
                 progress.complete_stage("uploading", "No upload required", 100)
             
             # Return success response
+            # Make sure to include the version for web app to use
             return {
                 "status": "success",
                 "message": upload_status,
                 "job_id": job_id,
                 "local_output": local_output_path,
-                "uploaded_to_dataworld": bool(version)
+                "uploaded_to_dataworld": bool(version),
+                "version": version  # Explicitly include version
             }
         except Exception as e:
             logger.error(f"Error in graph processing: {e}", exc_info=True)
